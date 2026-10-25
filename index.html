@@ -108,6 +108,35 @@
       </button>
     </div>
 
+
+    <!-- Online multiplayer lobby -->
+    <section id="onlineLobby" class="w-full mb-2 rounded-2xl border border-white/15 bg-slate-950/55 p-3 shadow-lg">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div>
+          <div class="text-sm font-extrabold text-white">🌐 Play Online</div>
+          <div class="text-[10px] text-sky-100/75">Create a room or join from another phone</div>
+        </div>
+        <span id="onlineStatus" class="rounded-full border border-white/15 bg-slate-900/70 px-2 py-1 text-[10px] font-bold text-slate-200">Offline</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="onlineName" maxlength="18" value="Player" aria-label="Your player name" placeholder="Your name" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2.5 py-2 text-xs text-white outline-none focus:border-sky-300" />
+        <select id="onlineSeatCount" aria-label="Players in match" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2 py-2 text-xs text-white">
+          <option value="2">2 players</option><option value="4">4 players</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="createOnlineRoomBtn" type="button" class="rounded-lg bg-emerald-500 px-2 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400">Create Room</button>
+        <button id="joinOnlineRoomBtn" type="button" class="rounded-lg bg-sky-500 px-2 py-2 text-xs font-extrabold text-slate-950 hover:bg-sky-400">Join Room</button>
+      </div>
+      <div id="onlineRoomJoinRow" class="hidden mt-2 grid grid-cols-[1fr_auto] gap-2">
+        <input id="onlineRoomCode" maxlength="6" aria-label="Room code" placeholder="Enter 6-character room code" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2.5 py-2 text-xs uppercase text-white outline-none focus:border-sky-300" />
+        <button id="connectOnlineRoomBtn" type="button" class="rounded-lg bg-white px-3 py-2 text-xs font-extrabold text-slate-900">Connect</button>
+      </div>
+      <div id="onlineRoomInfo" class="hidden mt-2 rounded-lg border border-emerald-300/25 bg-emerald-950/50 p-2 text-xs text-emerald-100"></div>
+      <button id="leaveOnlineRoomBtn" type="button" class="hidden mt-2 w-full rounded-lg border border-rose-300/30 bg-rose-950/40 px-3 py-2 text-xs font-bold text-rose-100">Disconnect from online match</button>
+      <p class="mt-2 text-[10px] leading-relaxed text-slate-300/80">The room host keeps the match state in sync. Share the room code privately. Both players need an internet connection.</p>
+    </section>
+
     <!-- Top-Right Opponent HUD (Dice Pod + Avatar with Timer Ring + 3 Green Chance Dots) -->
     <div class="w-full flex items-end justify-end pr-2 pt-1 pb-1 gap-3 relative">
       <!-- Info icon -->
@@ -390,6 +419,7 @@
     </div>
   </section>
 
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script>
     // =========================================================================
     // 1. SOUND ENGINE (Synthesized Web Audio API)
@@ -2037,6 +2067,295 @@
       animFrameId = requestAnimationFrame(tick);
     }
 
+
+    // =========================================================================
+    // ONLINE MULTIPLAYER (host-authoritative WebRTC via PeerJS)
+    // =========================================================================
+    let onlineRole = 'offline'; // offline | host | client
+    let onlinePeer = null;
+    let onlineHostConnection = null;
+    let onlineSeat = 0;
+    let onlineRoomCode = '';
+    let onlineSyncInterval = null;
+    const onlinePeerConnections = new Map();
+    const onlineSeatByPeer = new Map();
+    const localHandleRollDice = handleRollDice;
+    const localExecuteTokenMove = executeTokenMove;
+
+    function setOnlineStatus(message, tone = 'neutral') {
+      const el = document.getElementById('onlineStatus');
+      if (!el) return;
+      el.textContent = message;
+      el.className = 'rounded-full border px-2 py-1 text-[10px] font-bold ' +
+        (tone === 'good' ? 'border-emerald-300/30 bg-emerald-950/60 text-emerald-200' :
+         tone === 'bad' ? 'border-rose-300/30 bg-rose-950/60 text-rose-200' :
+         'border-white/15 bg-slate-900/70 text-slate-200');
+    }
+
+    function showOnlineRoom(code, message) {
+      const info = document.getElementById('onlineRoomInfo');
+      info.classList.remove('hidden');
+      info.innerHTML = '<div class="font-extrabold tracking-widest text-base">' + code + '</div><div class="mt-1">' + message + '</div>';
+    }
+
+    function getOnlineSnapshot() {
+      return {
+        type: 'snapshot',
+        players: activePlayers.map(p => ({ ...p })),
+        turnIndex, diceValue, phase, validTokenIndices: [...validTokenIndices],
+        remainingSeconds, turnRemainingMs, isTurnTimerRunning, isGamePaused,
+        currentTurnId, hasRolledThisTurn, selectedMinutes, turnDurationSeconds,
+        resolvedTurnIds: [...resolvedTurnIds], turnLogs: [...turnLogs]
+      };
+    }
+
+    function applyOnlineSnapshot(data) {
+      if (!data || !Array.isArray(data.players) || !data.players.length) return;
+      activePlayers = data.players.map(p => ({ ...p }));
+      turnIndex = Number(data.turnIndex) || 0;
+      diceValue = Number(data.diceValue) || 1;
+      phase = data.phase || 'ROLL';
+      validTokenIndices = Array.isArray(data.validTokenIndices) ? [...data.validTokenIndices] : [];
+      remainingSeconds = Number.isFinite(data.remainingSeconds) ? data.remainingSeconds : remainingSeconds;
+      turnRemainingMs = Number.isFinite(data.turnRemainingMs) ? data.turnRemainingMs : turnRemainingMs;
+      isTurnTimerRunning = !!data.isTurnTimerRunning;
+      isGamePaused = !!data.isGamePaused;
+      currentTurnId = Number(data.currentTurnId) || 0;
+      hasRolledThisTurn = !!data.hasRolledThisTurn;
+      selectedMinutes = Number(data.selectedMinutes) || selectedMinutes;
+      turnDurationSeconds = Number(data.turnDurationSeconds) || turnDurationSeconds;
+      resolvedTurnIds = new Set(data.resolvedTurnIds || []);
+      if (Array.isArray(data.turnLogs)) {
+        turnLogs = [...data.turnLogs];
+        const logBox = document.getElementById('turnHistoryLog');
+        if (logBox) logBox.innerHTML = turnLogs.map(line => '<div>' + String(line).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
+      }
+      updateTimerDisplay();
+      updateTurnTimerUI();
+      updateUI();
+      drawBoard();
+    }
+
+    function setOnlinePlayerName(seat, name) {
+      if (!activePlayers[seat]) return;
+      const safeName = String(name || '').trim().slice(0, 18);
+      if (!safeName) return;
+      activePlayers[seat].playerName = safeName;
+      activePlayers[seat].isBot = false;
+      activePlayers[seat].label = safeName + ' (' + activePlayers[seat].name + ')';
+    }
+
+    function broadcastOnlineSnapshot() {
+      if (onlineRole !== 'host') return;
+      const snapshot = getOnlineSnapshot();
+      onlinePeerConnections.forEach(conn => {
+        if (conn.open) {
+          try { conn.send(snapshot); } catch (e) { /* connection may be closing */ }
+        }
+      });
+    }
+
+    function disconnectOnline(silent = false) {
+      if (onlineSyncInterval) clearInterval(onlineSyncInterval);
+      onlineSyncInterval = null;
+      onlinePeerConnections.forEach(conn => { try { conn.close(); } catch (e) {} });
+      onlinePeerConnections.clear();
+      onlineSeatByPeer.clear();
+      if (onlineHostConnection) {
+        try { onlineHostConnection.close(); } catch (e) {}
+      }
+      onlineHostConnection = null;
+      if (onlinePeer) {
+        try { onlinePeer.destroy(); } catch (e) {}
+      }
+      onlinePeer = null;
+      onlineRole = 'offline';
+      onlineSeat = 0;
+      onlineRoomCode = '';
+      document.getElementById('onlineRoomJoinRow').classList.add('hidden');
+      document.getElementById('onlineRoomInfo').classList.add('hidden');
+      document.getElementById('leaveOnlineRoomBtn').classList.add('hidden');
+      document.getElementById('createOnlineRoomBtn').disabled = false;
+      document.getElementById('joinOnlineRoomBtn').disabled = false;
+      setOnlineStatus('Offline');
+      if (!silent) showTurnNotification('Disconnected from the online room.', 'Online', 'warn');
+    }
+
+    function acceptOnlineConnection(conn) {
+      onlinePeerConnections.set(conn.peer, conn);
+      conn.on('data', data => {
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'join') {
+          if (onlineSeatByPeer.has(conn.peer)) return;
+          const seat = activePlayers.findIndex((p, idx) => idx > 0 && !onlineSeatByPeerHasSeat(idx));
+          if (seat < 0) {
+            conn.send({ type: 'room_full' });
+            return;
+          }
+          onlineSeatByPeer.set(conn.peer, seat);
+          setOnlinePlayerName(seat, data.name || ('Player ' + (seat + 1)));
+          conn.send({ type: 'welcome', seat, snapshot: getOnlineSnapshot() });
+          setOnlineStatus('Room active', 'good');
+          showOnlineRoom(onlineRoomCode.toUpperCase(), (onlineSeatByPeer.size + 1) + ' player(s) connected. Share this code with friends.');
+          broadcastOnlineSnapshot();
+          updateUI();
+          drawBoard();
+          return;
+        }
+        const seat = onlineSeatByPeer.get(conn.peer);
+        if (seat === undefined) return;
+        if (data.type === 'roll' && seat === turnIndex && phase === 'ROLL' && !isGamePaused) {
+          localHandleRollDice();
+          broadcastOnlineSnapshot();
+        } else if (data.type === 'move' && seat === turnIndex && phase === 'MOVE' &&
+                   Number.isInteger(data.tokenIdx) && validTokenIndices.includes(data.tokenIdx) && !isGamePaused) {
+          localExecuteTokenMove(data.tokenIdx);
+          broadcastOnlineSnapshot();
+        } else if (data.type === 'new_game') {
+          setupGame();
+          broadcastOnlineSnapshot();
+        }
+      });
+      conn.on('close', () => {
+        onlinePeerConnections.delete(conn.peer);
+        onlineSeatByPeer.delete(conn.peer);
+        setOnlineStatus('Room active', 'good');
+        broadcastOnlineSnapshot();
+      });
+      conn.on('error', () => setOnlineStatus('Connection issue', 'bad'));
+    }
+
+    function onlineSeatByPeerHasSeat(seat) {
+      for (const assigned of onlineSeatByPeer.values()) if (assigned === seat) return true;
+      return false;
+    }
+
+    function connectToHost(roomCode) {
+      if (typeof Peer === 'undefined') {
+        setOnlineStatus('PeerJS failed to load', 'bad');
+        return;
+      }
+      disconnectOnline(true);
+      onlineRole = 'client';
+      onlineRoomCode = roomCode.toLowerCase();
+      onlinePeer = new Peer();
+      onlinePeer.on('open', () => {
+        onlineHostConnection = onlinePeer.connect('ludo-' + onlineRoomCode, { reliable: true });
+        onlineHostConnection.on('open', () => {
+          onlineHostConnection.send({ type: 'join', name: document.getElementById('onlineName').value || 'Player' });
+          setOnlineStatus('Connecting…');
+        });
+        onlineHostConnection.on('data', data => {
+          if (!data || typeof data !== 'object') return;
+          if (data.type === 'welcome') {
+            onlineSeat = data.seat;
+            clearTimers();
+            onlineRole = 'client';
+            document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+            document.getElementById('createOnlineRoomBtn').disabled = true;
+            document.getElementById('joinOnlineRoomBtn').disabled = true;
+            document.getElementById('onlineRoomJoinRow').classList.add('hidden');
+            setOnlineStatus('Connected · Seat ' + (onlineSeat + 1), 'good');
+            showOnlineRoom(onlineRoomCode.toUpperCase(), 'Connected. Your board will update automatically.');
+            applyOnlineSnapshot(data.snapshot);
+          } else if (data.type === 'snapshot') {
+            applyOnlineSnapshot(data);
+          } else if (data.type === 'room_full') {
+            setOnlineStatus('Room is full', 'bad');
+            showTurnNotification('This room already has all player seats filled.', 'Room Full', 'warn');
+          }
+        });
+        onlineHostConnection.on('close', () => {
+          clearTimers();
+          setOnlineStatus('Host disconnected', 'bad');
+        });
+        onlineHostConnection.on('error', () => setOnlineStatus('Could not connect', 'bad'));
+      });
+      onlinePeer.on('error', err => {
+        setOnlineStatus(err && err.type === 'peer-unavailable' ? 'Room not found' : 'Connection error', 'bad');
+      });
+      document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+    }
+
+    function createOnlineRoom() {
+      if (typeof Peer === 'undefined') {
+        setOnlineStatus('PeerJS failed to load', 'bad');
+        return;
+      }
+      disconnectOnline(true);
+      onlineRole = 'host';
+      onlineSeat = 0;
+      onlineRoomCode = Math.random().toString(36).slice(2, 8).padEnd(6, 'x').slice(0, 6).toLowerCase();
+      const peerId = 'ludo-' + onlineRoomCode;
+      onlinePeer = new Peer(peerId);
+      onlinePeer.on('open', () => {
+        const seatCount = document.getElementById('onlineSeatCount').value;
+        gameMode = seatCount === '4' ? '4p_human' : '2p_human';
+        setupGame();
+        setOnlinePlayerName(0, document.getElementById('onlineName').value || 'Host');
+        document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+        document.getElementById('createOnlineRoomBtn').disabled = true;
+        document.getElementById('joinOnlineRoomBtn').disabled = true;
+        setOnlineStatus('Room created', 'good');
+        showOnlineRoom(onlineRoomCode.toUpperCase(), 'Waiting for other players. Share this 6-character code.');
+        onlineSyncInterval = setInterval(broadcastOnlineSnapshot, 300);
+      });
+      onlinePeer.on('connection', acceptOnlineConnection);
+      onlinePeer.on('error', err => {
+        setOnlineStatus(err && err.type === 'unavailable-id' ? 'Room code collision — create again' : 'Peer connection error', 'bad');
+        if (onlinePeer) { try { onlinePeer.destroy(); } catch (e) {} }
+        onlinePeer = null;
+        onlineRole = 'offline';
+        document.getElementById('createOnlineRoomBtn').disabled = false;
+        document.getElementById('joinOnlineRoomBtn').disabled = false;
+      });
+    }
+
+    function requestOnlineNewGame() {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'new_game' });
+        return;
+      }
+      setupGame();
+      broadcastOnlineSnapshot();
+    }
+
+    handleRollDice = function() {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'roll' });
+        return;
+      }
+      if (onlineRole === 'host' && turnIndex !== onlineSeat) return;
+      return localHandleRollDice();
+    };
+
+    executeTokenMove = function(tokenIdx) {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'move', tokenIdx });
+        return;
+      }
+      if (onlineRole === 'host' && turnIndex !== onlineSeat) return;
+      return localExecuteTokenMove(tokenIdx);
+    };
+
+    document.getElementById('createOnlineRoomBtn').addEventListener('click', createOnlineRoom);
+    document.getElementById('joinOnlineRoomBtn').addEventListener('click', () => {
+      document.getElementById('onlineRoomJoinRow').classList.remove('hidden');
+      document.getElementById('onlineRoomCode').focus();
+    });
+    document.getElementById('connectOnlineRoomBtn').addEventListener('click', () => {
+      const code = document.getElementById('onlineRoomCode').value.trim().toLowerCase();
+      if (!/^[a-z0-9]{6}$/.test(code)) {
+        setOnlineStatus('Enter a 6-character code', 'bad');
+        return;
+      }
+      connectToHost(code);
+    });
+    document.getElementById('leaveOnlineRoomBtn').addEventListener('click', () => disconnectOnline());
+    document.getElementById('onlineRoomCode').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('connectOnlineRoomBtn').click();
+    });
+
     // =========================================================================
     // 8. EVENT LISTENERS & VISIBILITY RECONNECTION HANDLING
     // =========================================================================
@@ -2157,10 +2476,10 @@
       setupGame();
     });
 
-    document.getElementById('resetBtn').addEventListener('click', setupGame);
-    document.getElementById('playAgainBtn').addEventListener('click', setupGame);
-    document.getElementById('playGameModalBtn').addEventListener('click', setupGame);
-    document.getElementById('sidePlayGameBtn').addEventListener('click', setupGame);
+    document.getElementById('resetBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('playAgainBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('playGameModalBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('sidePlayGameBtn').addEventListener('click', requestOnlineNewGame);
 
     document.getElementById('muteBtn').addEventListener('click', () => {
       isMuted = !isMuted;
