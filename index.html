@@ -2194,9 +2194,13 @@
           }
           onlineSeatByPeer.set(conn.peer, seat);
           setOnlinePlayerName(seat, data.name || ('Player ' + (seat + 1)));
+          if (onlineSeatByPeer.size + 1 >= activePlayers.length && isGamePaused) {
+            isGamePaused = false;
+            beginTurnForIndex(0);
+          }
           conn.send({ type: 'welcome', seat, snapshot: getOnlineSnapshot() });
-          setOnlineStatus('Room active', 'good');
-          showOnlineRoom(onlineRoomCode.toUpperCase(), (onlineSeatByPeer.size + 1) + ' player(s) connected. Share this code with friends.');
+          setOnlineStatus(onlineSeatByPeer.size + 1 >= activePlayers.length ? 'Match ready' : 'Waiting for players', 'good');
+          showOnlineRoom(onlineRoomCode.toUpperCase(), (onlineSeatByPeer.size + 1) + ' of ' + activePlayers.length + ' player(s) connected. The match starts when all seats join.');
           broadcastOnlineSnapshot();
           updateUI();
           drawBoard();
@@ -2293,6 +2297,10 @@
         gameMode = seatCount === '4' ? '4p_human' : '2p_human';
         setupGame();
         setOnlinePlayerName(0, document.getElementById('onlineName').value || 'Host');
+        isGamePaused = true;
+        stopTurnTimer();
+        updateUI();
+        drawBoard();
         document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
         document.getElementById('createOnlineRoomBtn').disabled = true;
         document.getElementById('joinOnlineRoomBtn').disabled = true;
