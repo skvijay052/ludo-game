@@ -1,0 +1,2548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Play Ludo Supreme — Game Arena</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, #1b65b2 0%, #277cd1 50%, #175294 100%);
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .dice-box {
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease, opacity 0.2s ease;
+    }
+    .dice-rolling {
+      animation: shake 0.32s infinite;
+    }
+    @keyframes shake {
+      0% { transform: rotate(0deg) scale(1.08); }
+      25% { transform: rotate(-16deg) scale(1.14); }
+      50% { transform: rotate(14deg) scale(0.95); }
+      75% { transform: rotate(-12deg) scale(1.1); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    @keyframes bounceLeft {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-8px); }
+    }
+    .arrow-bounce {
+      animation: bounceLeft 0.75s ease-in-out infinite;
+    }
+    @keyframes startBannerAnim {
+      0% { opacity: 0; transform: scaleX(0.6); }
+      20% { opacity: 1; transform: scaleX(1.02); }
+      80% { opacity: 1; transform: scaleX(1); }
+      100% { opacity: 0; transform: scaleX(1.05); pointer-events: none; }
+    }
+    .start-banner-show {
+      animation: startBannerAnim 1.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    /* Teardrop dice pod containers matching the reference screenshots */
+    .dice-pod-bottom {
+      background: linear-gradient(145deg, #4b5563 0%, #1f2937 100%);
+      border: 2.5px solid #e2e8f0;
+      border-radius: 18px 28px 28px 28px;
+      transform: rotate(-45deg);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.25);
+    }
+    .dice-pod-bottom > * {
+      transform: rotate(45deg);
+    }
+    .dice-pod-top {
+      background: linear-gradient(145deg, #4b5563 0%, #1f2937 100%);
+      border: 2.5px solid #e2e8f0;
+      border-radius: 28px 28px 18px 28px;
+      transform: rotate(-45deg);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.25);
+    }
+    .dice-pod-top > * {
+      transform: rotate(45deg);
+    }
+    canvas {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-2 px-2 sm:px-4">
+
+  <!-- ===================================================================== -->
+  <!-- MOBILE ARENA SHELL (Matches Uploaded Ludo Supreme Reference Layout)   -->
+  <!-- ===================================================================== -->
+  <div class="w-full max-w-[470px] flex flex-col items-center relative">
+    <a href="./index.html" class="self-start inline-flex items-center gap-2 mb-1 px-3 py-2 rounded-xl border border-white/15 bg-slate-950/45 text-xs font-bold text-white hover:bg-slate-900/80 transition" aria-label="Back to homepage">
+      <span aria-hidden="true">←</span> Home
+    </a>
+
+    <!-- Top Floating Bar: Back/Settings Button (<) and Speaker Button (🔊) -->
+    <div class="w-full flex items-center justify-between px-1 pt-1 pb-1">
+      <button id="toggleDrawerBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-900/45 hover:bg-slate-900/65 border border-white/15 flex items-center justify-center text-white shadow-md transition" title="Toggle Game Controls &amp; Settings">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <!-- Quick Mode & Time Pills -->
+      <div class="flex items-center gap-1.5 bg-slate-900/40 backdrop-blur px-2.5 py-1 rounded-full border border-white/15 text-[11px]">
+        <button id="timer4mBtn" type="button" class="px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white transition">
+          4 Min
+        </button>
+        <button id="timer10mBtn" type="button" class="px-2 py-0.5 rounded-full font-semibold text-slate-200 hover:text-white transition">
+          10 Min
+        </button>
+        <button id="resetBtn" type="button" class="px-2 py-0.5 rounded-full bg-rose-500/30 hover:bg-rose-500/50 border border-rose-300/30 text-rose-100 font-semibold transition">
+          New Game
+        </button>
+      </div>
+
+      <button id="muteBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-900/45 hover:bg-slate-900/65 border border-white/15 flex items-center justify-center text-white shadow-md transition" title="Toggle Sound">
+        <span id="muteIcon" class="text-lg">🔊</span>
+        <span id="muteLabel" class="sr-only">Sound On</span>
+      </button>
+    </div>
+
+
+    <!-- Online multiplayer lobby -->
+    <section id="onlineLobby" class="w-full mb-2 rounded-2xl border border-white/15 bg-slate-950/55 p-3 shadow-lg">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div>
+          <div class="text-sm font-extrabold text-white">🌐 Play Online</div>
+          <div class="text-[10px] text-sky-100/75">Create a room or join from another phone</div>
+        </div>
+        <span id="onlineStatus" class="rounded-full border border-white/15 bg-slate-900/70 px-2 py-1 text-[10px] font-bold text-slate-200">Offline</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="onlineName" maxlength="18" value="Player" aria-label="Your player name" placeholder="Your name" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2.5 py-2 text-xs text-white outline-none focus:border-sky-300" />
+        <select id="onlineSeatCount" aria-label="Players in match" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2 py-2 text-xs text-white">
+          <option value="2">2 players</option><option value="4">4 players</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="createOnlineRoomBtn" type="button" class="rounded-lg bg-emerald-500 px-2 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-400">Create Room</button>
+        <button id="joinOnlineRoomBtn" type="button" class="rounded-lg bg-sky-500 px-2 py-2 text-xs font-extrabold text-slate-950 hover:bg-sky-400">Join Room</button>
+      </div>
+      <div id="onlineRoomJoinRow" class="hidden mt-2 grid grid-cols-[1fr_auto] gap-2">
+        <input id="onlineRoomCode" maxlength="6" aria-label="Room code" placeholder="Enter 6-character room code" class="min-w-0 rounded-lg border border-white/15 bg-slate-900 px-2.5 py-2 text-xs uppercase text-white outline-none focus:border-sky-300" />
+        <button id="connectOnlineRoomBtn" type="button" class="rounded-lg bg-white px-3 py-2 text-xs font-extrabold text-slate-900">Connect</button>
+      </div>
+      <div id="onlineRoomInfo" class="hidden mt-2 rounded-lg border border-emerald-300/25 bg-emerald-950/50 p-2 text-xs text-emerald-100"></div>
+      <button id="leaveOnlineRoomBtn" type="button" class="hidden mt-2 w-full rounded-lg border border-rose-300/30 bg-rose-950/40 px-3 py-2 text-xs font-bold text-rose-100">Disconnect from online match</button>
+      <p class="mt-2 text-[10px] leading-relaxed text-slate-300/80">The room host keeps the match state in sync. Share the room code privately. Both players need an internet connection.</p>
+    </section>
+
+    <!-- Top-Right Opponent HUD (Dice Pod + Avatar with Timer Ring + 3 Green Chance Dots) -->
+    <div class="w-full flex items-end justify-end pr-2 pt-1 pb-1 gap-3 relative">
+      <!-- Info icon -->
+      <button id="topInfoBtn" type="button" class="w-5 h-5 rounded-full bg-white text-sky-800 font-extrabold text-xs flex items-center justify-center shadow mb-1" title="3 Missed-Turn Chances Rules">
+        i
+      </button>
+
+      <!-- Opponent Teardrop Dice Pod -->
+      <button id="topOpponentDiceBtn" type="button" class="dice-pod-top w-14 h-14 flex items-center justify-center mb-3 transition" title="Opponent Dice">
+        <svg id="topDiceSvg" viewBox="0 0 100 100" class="w-9 h-9"></svg>
+      </button>
+
+      <!-- Opponent Avatar + Turn Timer Ring + Name + 3 Green Dots -->
+      <div class="flex flex-col items-center">
+        <div id="topAvatarRing" class="relative w-16 h-16 rounded-2xl p-1 bg-gradient-to-b from-amber-300 to-amber-500 shadow-xl flex items-center justify-center">
+          <div class="w-full h-full rounded-xl bg-slate-950 border-2 border-amber-200/80 flex flex-col items-center justify-center relative overflow-hidden">
+            <!-- Bot / Player 2 Avatar Graphic -->
+            <div class="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-xl shadow-inner">
+              🤖
+            </div>
+            <!-- Turn Timer Overlay when Opponent is on clock -->
+            <div id="topExtraTimeOverlay" class="hidden absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center text-[9px] font-black text-amber-300 leading-tight uppercase">
+              <span>TURN</span>
+              <span id="topTurnSecs">10s</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="topPlayerNamePill" class="mt-1 px-2.5 py-0.5 rounded-full bg-slate-900/55 border border-white/15 text-[11px] font-bold text-slate-100 leading-none">
+          Surya
+        </div>
+
+        <!-- 3 Missed-Turn Chance Dots (Green = Remaining, Dark = Missed) -->
+        <div id="topChanceDots" class="flex items-center gap-1.5 mt-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeout / Elimination Alert Toast Banner -->
+    <div id="turnAlertBanner" class="hidden w-full mb-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center justify-between shadow-lg transition-all">
+      <span id="turnAlertText">Vijay missed the turn. 2 chances remaining.</span>
+      <span id="turnAlertPill" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-950/60">1/3 Missed</span>
+    </div>
+
+    <!-- Match ID & Attached Top-Center Timer Tab (Exactly like reference images) -->
+    <div class="flex flex-col items-center -mb-0.5 z-10">
+      <div id="matchIdLabel" class="text-[11px] font-medium text-sky-200/80 tracking-wide mb-0.5">
+        #1920072578984078268
+      </div>
+      <div class="flex items-center gap-1.5 px-4 py-1 rounded-t-xl bg-[#0f3c5c] border-t-2 border-x-2 border-[#1e6a9e] text-white font-bold text-sm shadow-md">
+        <span class="text-xs">⏱</span>
+        <span id="timerDisplay" class="font-mono tracking-wider">04:00</span>
+        <button id="testTimeUpBtn" type="button" class="ml-1.5 px-1.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-[9px] font-sans font-bold text-amber-200 transition" title="Simulate match timer reaching 00:00 right now">
+          End Timer
+        </button>
+      </div>
+    </div>
+
+    <!-- Dark-Teal Rounded Board Frame Containing the 15x15 Ludo Canvas -->
+    <div id="boardContainer" class="w-full aspect-square bg-[#073b5e] p-2.5 sm:p-3 rounded-[28px] border-[3px] border-[#1c6ca1] shadow-[0_14px_35px_rgba(0,0,0,0.55)] flex items-center justify-center relative">
+      <canvas id="ludoCanvas" class="w-full h-full rounded-[20px] cursor-pointer"></canvas>
+
+      <!-- Pink/Gold "START" Banner Overlay (From Screenshot 2) -->
+      <div id="startBannerOverlay" class="start-banner-show pointer-events-none absolute inset-x-4 top-1/2 -translate-y-1/2 h-14 bg-gradient-to-r from-amber-500/80 via-pink-600/85 to-rose-600/80 border-y-2 border-amber-300/80 flex items-center justify-center shadow-2xl z-10 rounded-lg">
+        <span class="text-3xl sm:text-4xl font-black italic tracking-widest text-amber-300 drop-shadow-[0_3px_3px_rgba(0,0,0,0.6)]">
+          START
+        </span>
+      </div>
+
+      <!-- Center Dice Button (Hidden by default or subtle in center so both center & bottom dice pod work!) -->
+      <button id="centerDiceBtn" type="button" class="dice-box opacity-0 hover:opacity-95 focus:opacity-95 absolute w-12 h-12 rounded-xl bg-white/90 text-slate-900 shadow-lg flex flex-col items-center justify-center border-2 border-amber-400 disabled:pointer-events-none transition z-10" title="Click to Roll!">
+        <svg id="centerDiceSvg" viewBox="0 0 100 100" class="w-8 h-8"></svg>
+        <span id="centerDiceTag" class="text-[8px] font-extrabold uppercase px-1 rounded bg-slate-900 text-amber-300 -mt-1">
+          ROLL
+        </span>
+      </button>
+
+      <!-- Game Over: Winner & Loser Overlay Modal -->
+      <div id="winModal" class="hidden absolute inset-0 bg-slate-950/92 backdrop-blur-md rounded-[26px] flex flex-col items-center justify-center p-4 sm:p-6 text-center z-20">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-extrabold uppercase tracking-wider mb-2">
+          <span>🛑</span>
+          <span id="gameOverBadgeText">Time Complete • Game Over</span>
+        </div>
+        <h2 id="winTitle" class="text-xl sm:text-2xl font-extrabold text-white mb-1">Vijay Wins!</h2>
+        <p id="winSub" class="text-xs sm:text-sm text-slate-300 mb-3">Dice and board are locked. Final match standings:</p>
+
+        <div id="winScoreSummary" class="w-full max-w-sm bg-slate-900/95 border border-slate-800 rounded-xl p-3 mb-4 text-xs space-y-2 max-h-56 overflow-y-auto"></div>
+
+        <div class="flex items-center justify-center gap-3">
+          <button id="playGameModalBtn" type="button" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-lg transition">
+            ▶ Play Game
+          </button>
+          <button id="playAgainBtn" type="button" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition">
+            Play Again
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom-Left Player ("You") HUD: Avatar with Turn-Timer Ring + Teardrop Dice Pod + Green Arrow -->
+    <div class="w-full flex items-start justify-start pl-2 pt-2.5 pb-2 gap-3 relative">
+      <!-- "You" Avatar + Turn Timer Progress Ring + 3 Green Chance Dots -->
+      <div class="flex flex-col items-center">
+        <div id="bottomAvatarRing" class="relative w-16 h-16 rounded-2xl p-1 bg-gradient-to-b from-emerald-400 via-amber-400 to-rose-500 shadow-xl flex items-center justify-center transition-all">
+          <div class="w-full h-full rounded-xl bg-slate-950 border-2 border-amber-200/80 flex flex-col items-center justify-center relative overflow-hidden">
+            <div class="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-xl shadow-inner">
+              🧑
+            </div>
+            <!-- EXTRA TIME / Turn Countdown Overlay (From Screenshot 1) -->
+            <div id="bottomExtraTimeOverlay" class="hidden absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center text-[10px] font-black text-amber-300 leading-tight uppercase tracking-tighter">
+              <span>EXTRA</span>
+              <span>TIME</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="bottomPlayerNamePill" class="mt-1 px-3 py-0.5 rounded-full bg-slate-900/55 border border-white/15 text-[11px] font-bold text-white leading-none">
+          You
+        </div>
+
+        <!-- 3 Missed-Turn Chance Dots (Green = Remaining, Dark = Missed) -->
+        <div id="bottomChanceDots" class="flex items-center gap-1.5 mt-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-900 shadow"></span>
+        </div>
+      </div>
+
+      <!-- Bottom Teardrop Dice Pod (Main Clickable Dice for "You") -->
+      <button id="diceBtn" type="button" class="dice-box dice-pod-bottom w-16 h-16 flex items-center justify-center mt-1 disabled:opacity-45 disabled:pointer-events-none hover:scale-105 active:scale-95 transition focus:outline-none" aria-label="Roll Dice">
+        <svg id="diceSvg" viewBox="0 0 100 100" class="w-10 h-10"></svg>
+      </button>
+
+      <!-- Bouncing Green Arrow Pointing to Dice Pod on Player's Turn (From Screenshots 1 & 3) -->
+      <div id="greenTurnArrow" class="arrow-bounce mt-3 flex items-center">
+        <svg class="w-11 h-11 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" viewBox="0 0 64 64">
+          <polygon points="4,32 28,12 28,23 58,23 58,41 28,41 28,52" fill="#4ead00" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
+        </svg>
+      </div>
+
+      <!-- Info Icon & Live Turn Countdown Readout -->
+      <div class="ml-auto flex flex-col items-end justify-center pt-1 pr-1">
+        <div class="flex items-center gap-1.5 bg-slate-900/55 border border-white/15 px-2.5 py-1 rounded-xl">
+          <span id="turnDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+          <span id="turnName" class="text-xs font-extrabold text-white">Vijay (Green)</span>
+          <span id="turnTimerValue" class="font-mono text-xs font-extrabold text-amber-300 ml-1">10.0s</span>
+        </div>
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <span id="activeChancesBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-900/60 text-emerald-300 border border-white/15">
+            Chances: 3/3
+          </span>
+          <button id="simulateTimeoutBtn" type="button" class="px-2 py-0.5 rounded-full bg-rose-900/70 hover:bg-rose-800 border border-rose-400/40 text-rose-200 text-[10px] font-bold transition" title="Simulate current player missing their turn right now">
+            ⚡ Skip / Expire Turn
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- COLLAPSIBLE / COMPACT CONTROL & INSPECTOR PANEL BELOW ARENA           -->
+  <!-- ===================================================================== -->
+  <section id="controlsDrawer" class="w-full max-w-[470px] mt-1 bg-slate-900/90 backdrop-blur border border-white/15 rounded-2xl p-3.5 shadow-2xl space-y-3">
+    <!-- Turn Status & Quick Action Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+      <div class="flex items-center gap-2">
+        <span id="statusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+          Roll the Dice
+        </span>
+        <span id="turnTimerStateTag" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300">
+          Counting Down
+        </span>
+        <span id="lastRollText" class="text-xs font-semibold text-slate-300">Ready</span>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button id="rollActionBtn" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-35 disabled:pointer-events-none text-white font-bold text-xs shadow transition">
+          🎲 Roll Dice
+        </button>
+        <button id="sidePlayGameBtn" type="button" class="hidden px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow transition">
+          ▶ Play Game
+        </button>
+        <button id="pauseGameBtn" type="button" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition">
+          ⏸ Pause
+        </button>
+      </div>
+    </div>
+
+    <!-- Turn Timer Progress Bar & Mode / Turn Duration Selectors -->
+    <div class="space-y-2">
+      <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div id="turnTimerBar" class="h-full bg-emerald-500 transition-all duration-100" style="width: 100%"></div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <p id="instructionText" class="text-xs text-slate-300 leading-relaxed flex-1 min-w-[180px]">
+          Tap your bottom-left <strong>Dice Pod</strong> (or press Space) to roll!
+        </p>
+
+        <div class="flex items-center gap-1.5">
+          <label for="turnLimitSelect" class="text-slate-400 font-medium">Turn:</label>
+          <select id="turnLimitSelect" class="bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1 text-amber-300 font-bold focus:outline-none">
+            <option value="5">5s</option>
+            <option value="10" selected>10s</option>
+            <option value="15">15s</option>
+            <option value="20">20s</option>
+          </select>
+
+          <label for="modeSelect" class="sr-only">Game Mode</label>
+          <select id="modeSelect" class="bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 rounded-lg px-2 py-1 focus:outline-none">
+            <option value="2p_human">2 Players (Vijay vs Surya)</option>
+            <option value="2p_bot" selected>Green (You) vs Blue (Bot)</option>
+            <option value="4p_bot">4 Players (You + 3 Bots)</option>
+            <option value="4p_human">4 Players (Pass &amp; Play)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direct Token Selector Buttons -->
+    <div class="pt-1 border-t border-slate-800/80">
+      <div class="text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center justify-between">
+        <span>Select Pawn to Move (or tap directly on the board):</span>
+        <span id="bonusRollHint" class="text-amber-400 hidden">✨ Bonus Roll Earned!</span>
+      </div>
+      <div class="grid grid-cols-4 gap-1.5">
+        <button id="tokenBtn0" type="button" disabled class="py-1 px-2 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 disabled:opacity-35 disabled:pointer-events-none hover:bg-slate-700 transition">
+          Token #1
+        </button>
+        <button id="tokenBtn1" type="button" disabled class="py-1 px-2 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 disabled:opacity-35 disabled:pointer-events-none hover:bg-slate-700 transition">
+          Token #2
+        </button>
+        <button id="tokenBtn2" type="button" disabled class="py-1 px-2 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 disabled:opacity-35 disabled:pointer-events-none hover:bg-slate-700 transition">
+          Token #3
+        </button>
+        <button id="tokenBtn3" type="button" disabled class="py-1 px-2 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 disabled:opacity-35 disabled:pointer-events-none hover:bg-slate-700 transition">
+          Token #4
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Standings & Turn Event Log -->
+    <div class="pt-2 border-t border-slate-800/80">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Standings &amp; Chances</span>
+        <span id="startRuleBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">
+          3 Chances • <span id="turnIdIndicator">Turn #1</span>
+        </span>
+      </div>
+      <div id="scoreboardGrid" class="grid grid-cols-2 gap-1.5 mb-2"></div>
+      <div id="turnHistoryLog" class="max-h-20 overflow-y-auto bg-slate-950/80 border border-slate-800 rounded-xl p-2 text-[10px] font-mono text-slate-300 space-y-0.5"></div>
+    </div>
+
+    <!-- Step-by-Step Code Architecture Tabs -->
+    <div class="pt-2 border-t border-slate-800/80">
+      <div class="flex gap-1.5 mb-2">
+        <button id="tabBtnHtml" type="button" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white transition">
+          1. Board Grid
+        </button>
+        <button id="tabBtnState" type="button" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          2. Game State
+        </button>
+        <button id="tabBtnRules" type="button" class="flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          3. Turn Rules
+        </button>
+      </div>
+      <div id="tabContentHtml" class="text-[11px] text-slate-300 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+        <strong>🎨 Mobile Arena Layout:</strong> Matches the reference design with Yellow (top-left), Blue (top-right, First Mover), Green (bottom-left, Second Mover), and Red (bottom-right) rounded bases, large Score readouts inside the white corner cards, 3D pawns, and teardrop dice pods.
+      </div>
+      <div id="tabContentState" class="hidden text-[11px] text-slate-300 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+        <strong>⏱️ Turn Timer &amp; 3 Green Dots:</strong> Each player's avatar has 3 green dots (<code class="text-emerald-300">remainingChances: 3/3</code>) and an animated timer ring that flashes <code class="text-amber-300">EXTRA TIME</code> when under 4 seconds.
+      </div>
+      <div id="tabContentRules" class="hidden text-[11px] text-slate-300 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+        <strong>🚫 3-Strike Elimination:</strong> Missing 3 turns across the match eliminates that player immediately and crowns the remaining active player the winner.
+      </div>
+    </div>
+  </section>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script>
+    // =========================================================================
+    // 1. SOUND ENGINE (Synthesized Web Audio API)
+    // =========================================================================
+    let audioCtx = null;
+    let isMuted = false;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq, type, duration, delay = 0, gainVal = 0.12) {
+      if (isMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(gainVal, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+
+    function sfxRoll() {
+      playTone(240, 'triangle', 0.05, 0.0, 0.1);
+      playTone(340, 'triangle', 0.05, 0.05, 0.1);
+      playTone(460, 'sine', 0.08, 0.1, 0.12);
+    }
+
+    function sfxHop(stepCount) {
+      playTone(420 + (stepCount % 6) * 45, 'sine', 0.065, 0, 0.11);
+    }
+
+    function sfxCapture() {
+      playTone(587.33, 'sawtooth', 0.1, 0, 0.14);
+      playTone(440, 'sawtooth', 0.12, 0.08, 0.14);
+      playTone(880, 'triangle', 0.22, 0.16, 0.16);
+    }
+
+    function sfxTimeoutPenalty() {
+      playTone(310, 'sawtooth', 0.14, 0, 0.14);
+      playTone(220, 'sawtooth', 0.22, 0.12, 0.15);
+    }
+
+    function sfxEliminated() {
+      playTone(300, 'sawtooth', 0.14, 0, 0.16);
+      playTone(240, 'sawtooth', 0.14, 0.12, 0.16);
+      playTone(170, 'sawtooth', 0.28, 0.24, 0.18);
+    }
+
+    function sfxHomeBonus() {
+      playTone(523.25, 'triangle', 0.1, 0, 0.14);
+      playTone(659.25, 'triangle', 0.1, 0.08, 0.14);
+      playTone(783.99, 'triangle', 0.18, 0.16, 0.16);
+    }
+
+    function sfxWin() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+        playTone(f, 'triangle', 0.22, idx * 0.11, 0.16);
+      });
+    }
+
+    // =========================================================================
+    // 2. BOARD COORDINATES (15x15 Grid Matching Uploaded Reference Images)
+    // =========================================================================
+    // 52-tile clockwise main track:
+    // Index 0: Left arm top (1,6) [Yellow start]
+    // Index 13: Top arm right (8,1) [Blue start]
+    // Index 26: Right arm bottom (13,8) [Red start]
+    // Index 39: Bottom arm left (6,13) [Green start]
+    const MAIN_TRACK = [
+      [1,6],[2,6],[3,6],[4,6],[5,6],
+      [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],
+      [7,0],[8,0],
+      [8,1],[8,2],[8,3],[8,4],[8,5],
+      [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],
+      [14,7],[14,8],
+      [13,8],[12,8],[11,8],[10,8],[9,8],
+      [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
+      [7,14],[6,14],
+      [6,13],[6,12],[6,11],[6,10],[6,9],
+      [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
+      [0,7],[0,6]
+    ];
+
+    // Safe track indices: 4 colored start squares (0, 13, 26, 39) + 4 grey star squares (8, 21, 34, 47)
+    const SAFE_INDICES = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+    const STAR_ONLY_INDICES = new Set([8, 21, 34, 47]);
+
+    // Color positions matching reference screenshots:
+    // Corner TL (0,0): Yellow (#f9b208)
+    // Corner TR (9,0): Blue (#2294f2) -> First Mover
+    // Corner BR (9,9): Red (#f43f5e)
+    // Corner BL (0,9): Green (#52b700) -> Second Mover ("You")
+    const PLAYER_CONFIG = [
+      {
+        id: 0,
+        name: 'Green',
+        moverTitle: 'Second Mover',
+        moverPos: 'bottom',
+        cornerCol: 0,
+        cornerRow: 9,
+        defaultPlayerName: 'Vijay',
+        hex: '#52b700',
+        darkHex: '#367a00',
+        lightHex: '#dcfce7',
+        borderHex: '#285e00',
+        startOffset: 39, // (6, 13) bottom-left start square
+        yardCenters: [[1.8, 10.8], [4.2, 10.8], [1.8, 13.2], [4.2, 13.2]],
+        homeStretch: [[7,13], [7,12], [7,11], [7,10], [7,9]],
+        homeGoal: [7.5, 8.55]
+      },
+      {
+        id: 1,
+        name: 'Yellow',
+        moverTitle: 'Third Mover',
+        moverPos: 'top',
+        cornerCol: 0,
+        cornerRow: 0,
+        defaultPlayerName: 'Arjun',
+        hex: '#f9b208',
+        darkHex: '#b47b00',
+        lightHex: '#fef3c7',
+        borderHex: '#92400e',
+        startOffset: 0, // (1, 6) top-left start square
+        yardCenters: [[1.8, 1.8], [4.2, 1.8], [1.8, 4.2], [4.2, 4.2]],
+        homeStretch: [[1,7], [2,7], [3,7], [4,7], [5,7]],
+        homeGoal: [6.45, 7.5]
+      },
+      {
+        id: 2,
+        name: 'Blue',
+        moverTitle: 'First Mover',
+        moverPos: 'top',
+        cornerCol: 9,
+        cornerRow: 0,
+        defaultPlayerName: 'Surya',
+        hex: '#2294f2',
+        darkHex: '#1360a8',
+        lightHex: '#dbeafe',
+        borderHex: '#1e40af',
+        startOffset: 13, // (8, 1) top-right start square
+        yardCenters: [[10.8, 1.8], [13.2, 1.8], [10.8, 4.2], [13.2, 4.2]],
+        homeStretch: [[7,1], [7,2], [7,3], [7,4], [7,5]],
+        homeGoal: [7.5, 6.45]
+      },
+      {
+        id: 3,
+        name: 'Red',
+        moverTitle: 'Fourth Mover',
+        moverPos: 'bottom',
+        cornerCol: 9,
+        cornerRow: 9,
+        defaultPlayerName: 'Kiran',
+        hex: '#f43f5e',
+        darkHex: '#be123c',
+        lightHex: '#ffe4e6',
+        borderHex: '#9f1239',
+        startOffset: 26, // (13, 8) bottom-right start square
+        yardCenters: [[10.8, 10.8], [13.2, 10.8], [10.8, 13.2], [13.2, 13.2]],
+        homeStretch: [[13,7], [12,7], [11,7], [10,7], [9,7]],
+        homeGoal: [8.55, 7.5]
+      }
+    ];
+
+    // =========================================================================
+    // 3. GAME & TURN MANAGEMENT STATE
+    // =========================================================================
+    const MAX_MISSED_CHANCES = 3;
+
+    let gameMode = '2p_bot';
+    let selectedMinutes = 4;
+    let remainingSeconds = 4 * 60;
+    let countdownInterval = null;
+
+    let turnDurationSeconds = 10;
+    let turnRemainingMs = 10000;
+    let turnDeadlineMs = 0;
+    let turnTickInterval = null;
+    let isTurnTimerRunning = false;
+    let isGamePaused = false;
+
+    let currentTurnId = 0;
+    let resolvedTurnIds = new Set();
+    let hasRolledThisTurn = false;
+
+    let activePlayers = [];
+    let turnIndex = 0;
+    let diceValue = 6;
+    let phase = 'ROLL'; // 'ROLL', 'MOVE', 'ANIMATING', 'BOT_WAIT', 'GAME_OVER'
+    let validTokenIndices = [];
+    let botTimer = null;
+    let rollTimer = null;
+    let hopInterval = null;
+    let pulseFrame = 0;
+    let animFrameId = null;
+
+    let movingAnim = null;
+    let floatingPopups = [];
+    let turnLogs = [];
+
+    const canvas = document.getElementById('ludoCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function clearTimers() {
+      if (botTimer) {
+        clearTimeout(botTimer);
+        botTimer = null;
+      }
+      if (rollTimer) {
+        clearTimeout(rollTimer);
+        rollTimer = null;
+      }
+      if (hopInterval) {
+        clearInterval(hopInterval);
+        hopInterval = null;
+      }
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      stopTurnTimer();
+      document.getElementById('diceBtn').classList.remove('dice-rolling');
+      document.getElementById('centerDiceBtn').classList.remove('dice-rolling');
+      document.getElementById('topOpponentDiceBtn').classList.remove('dice-rolling');
+    }
+
+    function createPlayer(cfg, isBot, playerName, label) {
+      return {
+        ...cfg,
+        playerId: `player_${cfg.id}`,
+        playerName,
+        isBot,
+        label,
+        tokens: [0, 0, 0, 0],
+        remainingChances: MAX_MISSED_CHANCES,
+        missedTurns: 0,
+        status: 'ACTIVE',
+        turnStatus: 'WAITING',
+        capturePoints: 0,
+        homeBonusPoints: 0,
+        score: 0
+      };
+    }
+
+    function recalcPlayerScore(p) {
+      const stepSum = p.tokens.reduce((acc, s) => acc + Math.max(0, s), 0);
+      p.score = stepSum + p.capturePoints + p.homeBonusPoints;
+    }
+
+    function appendTurnLog(message) {
+      const stamp = new Date().toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
+      turnLogs.unshift(`[${stamp}] ${message}`);
+      if (turnLogs.length > 25) turnLogs.pop();
+      const box = document.getElementById('turnHistoryLog');
+      if (box) {
+        box.innerHTML = turnLogs.map(line => `<div>${line}</div>`).join('');
+      }
+    }
+
+    function showTurnNotification(message, pillText, tone = 'warn') {
+      const banner = document.getElementById('turnAlertBanner');
+      const textEl = document.getElementById('turnAlertText');
+      const pillEl = document.getElementById('turnAlertPill');
+      textEl.textContent = message;
+      pillEl.textContent = pillText;
+      banner.classList.remove('hidden');
+
+      if (tone === 'elim') {
+        banner.className = 'w-full mb-1.5 px-3 py-1.5 rounded-xl border border-rose-500/60 bg-rose-950/90 text-rose-200 text-xs font-bold flex items-center justify-between shadow-lg transition-all';
+      } else if (tone === 'win') {
+        banner.className = 'w-full mb-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/60 bg-emerald-950/90 text-emerald-200 text-xs font-bold flex items-center justify-between shadow-lg transition-all';
+      } else {
+        banner.className = 'w-full mb-1.5 px-3 py-1.5 rounded-xl border border-amber-500/60 bg-amber-950/90 text-amber-200 text-xs font-bold flex items-center justify-between shadow-lg transition-all';
+      }
+    }
+
+    function triggerStartBanner() {
+      const banner = document.getElementById('startBannerOverlay');
+      if (!banner) return;
+      banner.classList.remove('start-banner-show');
+      void banner.offsetWidth;
+      banner.classList.add('start-banner-show');
+    }
+
+    function setupGame() {
+      clearTimers();
+      movingAnim = null;
+      floatingPopups = [];
+      turnLogs = [];
+      resolvedTurnIds.clear();
+      currentTurnId = 0;
+      hasRolledThisTurn = false;
+      isGamePaused = false;
+      document.getElementById('pauseGameBtn').textContent = '⏸ Pause';
+      document.getElementById('turnAlertBanner').classList.add('hidden');
+      triggerStartBanner();
+
+      if (gameMode === '2p_bot') {
+        activePlayers = [
+          createPlayer(PLAYER_CONFIG[0], false, 'Vijay', 'Vijay (Green)'),
+          createPlayer(PLAYER_CONFIG[2], true,  'Surya', 'Surya (Blue Bot)')
+        ];
+      } else if (gameMode === '2p_human') {
+        activePlayers = [
+          createPlayer(PLAYER_CONFIG[0], false, 'Vijay', 'Vijay (Green)'),
+          createPlayer(PLAYER_CONFIG[2], false, 'Surya', 'Surya (Blue)')
+        ];
+      } else if (gameMode === '4p_human') {
+        activePlayers = [
+          createPlayer(PLAYER_CONFIG[0], false, 'Vijay', 'Vijay (Green)'),
+          createPlayer(PLAYER_CONFIG[1], false, 'Arjun', 'Arjun (Yellow)'),
+          createPlayer(PLAYER_CONFIG[2], false, 'Surya', 'Surya (Blue)'),
+          createPlayer(PLAYER_CONFIG[3], false, 'Kiran', 'Kiran (Red)')
+        ];
+      } else {
+        activePlayers = [
+          createPlayer(PLAYER_CONFIG[0], false, 'Vijay', 'Vijay (Green)'),
+          createPlayer(PLAYER_CONFIG[1], true,  'Arjun', 'Arjun (Bot)'),
+          createPlayer(PLAYER_CONFIG[2], true,  'Surya', 'Surya (Bot)'),
+          createPlayer(PLAYER_CONFIG[3], true,  'Kiran', 'Kiran (Bot)')
+        ];
+      }
+
+      activePlayers.forEach(recalcPlayerScore);
+
+      turnIndex = 0;
+      diceValue = 6;
+      validTokenIndices = [];
+      remainingSeconds = selectedMinutes * 60;
+      updateTimerDisplay();
+
+      countdownInterval = setInterval(() => {
+        if (phase === 'GAME_OVER' || isGamePaused) return;
+        remainingSeconds = Math.max(0, remainingSeconds - 1);
+        updateTimerDisplay();
+        if (remainingSeconds === 0) {
+          endGameByTimer();
+        }
+      }, 1000);
+
+      document.getElementById('winModal').classList.add('hidden');
+      document.getElementById('bonusRollHint').classList.add('hidden');
+      document.getElementById('testTimeUpBtn').disabled = false;
+      appendTurnLog(`Match started (${activePlayers.map(p => p.playerName).join(' vs ')}).`);
+      beginTurnForIndex(0);
+    }
+
+    // =========================================================================
+    // 4. AUTOMATIC TURN TIMER & THREE-STRIKE ELIMINATION SYSTEM
+    // =========================================================================
+    function stopTurnTimer() {
+      if (turnTickInterval) {
+        clearInterval(turnTickInterval);
+        turnTickInterval = null;
+      }
+      isTurnTimerRunning = false;
+      updateTurnTimerUI();
+    }
+
+    function startTurnTimer(forTurnId) {
+      stopTurnTimer();
+      turnRemainingMs = turnDurationSeconds * 1000;
+      turnDeadlineMs = Date.now() + turnRemainingMs;
+      isTurnTimerRunning = true;
+      updateTurnTimerUI();
+
+      turnTickInterval = setInterval(() => {
+        if (phase === 'GAME_OVER' || !isTurnTimerRunning) {
+          stopTurnTimer();
+          return;
+        }
+        if (isGamePaused) {
+          turnDeadlineMs = Date.now() + turnRemainingMs;
+          return;
+        }
+        turnRemainingMs = Math.max(0, turnDeadlineMs - Date.now());
+        updateTurnTimerUI();
+
+        if (turnRemainingMs <= 0) {
+          handleTurnTimeout(forTurnId);
+        }
+      }, 80);
+    }
+
+    function renderChanceDots(containerId, remaining) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      const dots = [];
+      for (let i = 0; i < MAX_MISSED_CHANCES; i++) {
+        const isAlive = i < remaining;
+        dots.push(
+          `<span class="w-2.5 h-2.5 rounded-full ${isAlive ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-800 opacity-60'} border border-slate-900"></span>`
+        );
+      }
+      el.innerHTML = dots.join('');
+    }
+
+    function updateTurnTimerUI() {
+      const valEl = document.getElementById('turnTimerValue');
+      const barEl = document.getElementById('turnTimerBar');
+      const tagEl = document.getElementById('turnTimerStateTag');
+      const simBtn = document.getElementById('simulateTimeoutBtn');
+
+      const totalMs = Math.max(1, turnDurationSeconds * 1000);
+      const pct = Math.max(0, Math.min(100, (turnRemainingMs / totalMs) * 100));
+      const secsStr = (turnRemainingMs / 1000).toFixed(1) + 's';
+
+      valEl.textContent = secsStr;
+      barEl.style.width = `${pct}%`;
+
+      // Update "EXTRA TIME" / low-timer overlays on the bottom and top avatars (like Screenshot 1)
+      const bottomOverlay = document.getElementById('bottomExtraTimeOverlay');
+      const topOverlay = document.getElementById('topExtraTimeOverlay');
+      const topTurnSecs = document.getElementById('topTurnSecs');
+      const curP = currentPlayer();
+      const isBottomTurn = (curP && curP.id === 0 && phase !== 'GAME_OVER');
+      const isTopTurn = (curP && curP.id !== 0 && phase !== 'GAME_OVER');
+
+      if (bottomOverlay) {
+        bottomOverlay.classList.toggle('hidden', !(isBottomTurn && isTurnTimerRunning && pct <= 45));
+      }
+      if (topOverlay && topTurnSecs) {
+        topTurnSecs.textContent = Math.ceil(turnRemainingMs / 1000) + 's';
+        topOverlay.classList.toggle('hidden', !(isTopTurn && isTurnTimerRunning));
+      }
+
+      if (phase === 'GAME_OVER') {
+        tagEl.textContent = 'Match Over';
+        tagEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300';
+        barEl.className = 'h-full bg-slate-600 transition-all duration-100';
+        simBtn.disabled = true;
+      } else if (isGamePaused) {
+        tagEl.textContent = 'Paused';
+        tagEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300';
+        simBtn.disabled = true;
+      } else if (!isTurnTimerRunning && hasRolledThisTurn) {
+        tagEl.textContent = 'Rolled ✓ (Stopped)';
+        tagEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300';
+        barEl.className = 'h-full bg-indigo-500 transition-all duration-100';
+        simBtn.disabled = true;
+      } else {
+        tagEl.textContent = 'Counting Down';
+        tagEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300';
+        barEl.className = pct <= 30
+          ? 'h-full bg-rose-500 transition-all duration-100'
+          : (pct <= 60 ? 'h-full bg-amber-400 transition-all duration-100' : 'h-full bg-emerald-500 transition-all duration-100');
+        simBtn.disabled = false;
+      }
+    }
+
+    function getNonEliminatedPlayers() {
+      return activePlayers.filter(p => p.status === 'ACTIVE');
+    }
+
+    function findNextActivePlayerIndex(fromIndex) {
+      const total = activePlayers.length;
+      for (let offset = 1; offset <= total; offset++) {
+        const candidateIdx = (fromIndex + offset) % total;
+        if (activePlayers[candidateIdx].status === 'ACTIVE') {
+          return candidateIdx;
+        }
+      }
+      return -1;
+    }
+
+    function beginTurnForIndex(nextIdx, isBonusRoll = false) {
+      if (phase === 'GAME_OVER') return;
+      if (botTimer) {
+        clearTimeout(botTimer);
+        botTimer = null;
+      }
+      if (rollTimer) {
+        clearTimeout(rollTimer);
+        rollTimer = null;
+      }
+
+      turnIndex = nextIdx;
+      const player = currentPlayer();
+
+      if (!player || player.status !== 'ACTIVE') {
+        const fallbackIdx = findNextActivePlayerIndex(turnIndex);
+        if (fallbackIdx === -1) return;
+        turnIndex = fallbackIdx;
+      }
+
+      activePlayers.forEach((p, idx) => {
+        if (p.status === 'ACTIVE') {
+          p.turnStatus = (idx === turnIndex) ? 'ACTIVE_TURN' : 'WAITING';
+        }
+      });
+
+      currentTurnId += 1;
+      const thisTurnId = currentTurnId;
+      hasRolledThisTurn = false;
+      phase = 'ROLL';
+      validTokenIndices = [];
+
+      document.getElementById('turnIdIndicator').textContent = `Turn #${thisTurnId}`;
+      if (!isBonusRoll) {
+        document.getElementById('bonusRollHint').classList.add('hidden');
+      }
+
+      const activePlayer = currentPlayer();
+      document.getElementById('instructionText').textContent = activePlayer.isBot
+        ? `${activePlayer.label} is on the clock (${turnDurationSeconds}s)...`
+        : `${activePlayer.playerName}'s turn! Roll within ${turnDurationSeconds}s (${activePlayer.remainingChances}/${MAX_MISSED_CHANCES} chances left).`;
+
+      startTurnTimer(thisTurnId);
+      updateUI();
+      drawBoard();
+
+      if (activePlayer.isBot) {
+        botTimer = setTimeout(() => {
+          if (phase === 'GAME_OVER' || isGamePaused || currentTurnId !== thisTurnId) return;
+          handleRollDice();
+        }, 650);
+      }
+    }
+
+    function handleTurnTimeout(expiredTurnId = currentTurnId) {
+      if (phase === 'GAME_OVER') return false;
+      if (expiredTurnId !== currentTurnId) return false;
+      if (resolvedTurnIds.has(expiredTurnId) || hasRolledThisTurn) return false;
+
+      resolvedTurnIds.add(expiredTurnId);
+      stopTurnTimer();
+
+      if (botTimer) {
+        clearTimeout(botTimer);
+        botTimer = null;
+      }
+      if (rollTimer) {
+        clearTimeout(rollTimer);
+        rollTimer = null;
+      }
+
+      phase = 'BOT_WAIT';
+      validTokenIndices = [];
+
+      const player = currentPlayer();
+      player.missedTurns += 1;
+      player.remainingChances = Math.max(0, MAX_MISSED_CHANCES - player.missedTurns);
+      player.turnStatus = 'MISSED';
+
+      const strikeCount = player.missedTurns;
+      const remaining = player.remainingChances;
+
+      if (strikeCount >= MAX_MISSED_CHANCES || remaining <= 0) {
+        player.status = 'ELIMINATED';
+        player.turnStatus = 'ELIMINATED';
+        sfxEliminated();
+
+        const elimMsg = `${player.playerName} missed 3/3 turns and is ELIMINATED!`;
+        showTurnNotification(elimMsg, `3/3 Eliminated`, 'elim');
+        appendTurnLog(`🚫 ${elimMsg}`);
+        document.getElementById('instructionText').textContent = elimMsg;
+        updateUI();
+        drawBoard();
+
+        const remainingActive = getNonEliminatedPlayers();
+        if (remainingActive.length === 1) {
+          endGameByLastPlayerStanding(remainingActive[0], player);
+          return true;
+        } else if (remainingActive.length === 0) {
+          endGameByTimer();
+          return true;
+        }
+      } else {
+        sfxTimeoutPenalty();
+        const chanceWord = remaining === 1 ? 'chance' : 'chances';
+        const missMsg = `${player.playerName} missed the turn. ${remaining} ${chanceWord} remaining.`;
+        showTurnNotification(missMsg, `Missed ${strikeCount}/${MAX_MISSED_CHANCES}`, 'warn');
+        appendTurnLog(`⚠️ ${missMsg} (${strikeCount}/${MAX_MISSED_CHANCES})`);
+        document.getElementById('instructionText').textContent = missMsg;
+        updateUI();
+        drawBoard();
+      }
+
+      const nextIdx = findNextActivePlayerIndex(turnIndex);
+      if (nextIdx !== -1 && phase !== 'GAME_OVER') {
+        beginTurnForIndex(nextIdx, false);
+      }
+      return true;
+    }
+
+    function endGameByLastPlayerStanding(winnerPlayer, lastEliminatedPlayer) {
+      clearTimers();
+      movingAnim = null;
+      validTokenIndices = [];
+      phase = 'GAME_OVER';
+      winnerPlayer.status = 'WINNER';
+      winnerPlayer.turnStatus = 'WINNER';
+      document.getElementById('testTimeUpBtn').disabled = true;
+      sfxWin();
+      const winBannerMsg = `${lastEliminatedPlayer.playerName} was eliminated (3/3 missed turns). ${winnerPlayer.playerName} wins the match!`;
+      showTurnNotification(winBannerMsg, `🏆 ${winnerPlayer.playerName} Wins`, 'win');
+      appendTurnLog(`🏆 ${winBannerMsg}`);
+
+      document.getElementById('gameOverBadgeText').textContent = '🚫 3-Strike Elimination • Game Over';
+      document.getElementById('winTitle').textContent = `🏆 Winner: ${winnerPlayer.label}`;
+      document.getElementById('winSub').textContent =
+        `${lastEliminatedPlayer.playerName} missed 3/3 turns and was eliminated. ${winnerPlayer.playerName} is the last active player!`;
+      document.getElementById('instructionText').textContent =
+        `🛑 Match Over! ${winnerPlayer.playerName} wins by elimination. Click Play Game to start a new match.`;
+
+      const sorted = [...activePlayers].sort((a, b) => {
+        if (a.status === 'WINNER') return -1;
+        if (b.status === 'WINNER') return 1;
+        if (a.status === 'ELIMINATED' && b.status !== 'ELIMINATED') return 1;
+        if (b.status === 'ELIMINATED' && a.status !== 'ELIMINATED') return -1;
+        return b.score - a.score;
+      });
+
+      renderWinSummary(sorted, winnerPlayer.score);
+      document.getElementById('winModal').classList.remove('hidden');
+      updateUI();
+      drawBoard();
+    }
+
+    function updateTimerDisplay() {
+      const mins = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+      const secs = String(remainingSeconds % 60).padStart(2, '0');
+      const el = document.getElementById('timerDisplay');
+      el.textContent = `${mins}:${secs}`;
+      if (remainingSeconds === 0) {
+        el.className = 'font-mono tracking-wider text-rose-400 font-extrabold';
+      } else if (remainingSeconds <= 30) {
+        el.className = 'font-mono tracking-wider text-rose-300 animate-pulse';
+      } else {
+        el.className = 'font-mono tracking-wider text-white';
+      }
+    }
+
+    function endGameByTimer() {
+      clearTimers();
+      remainingSeconds = 0;
+      updateTimerDisplay();
+      movingAnim = null;
+      validTokenIndices = [];
+      phase = 'GAME_OVER';
+      document.getElementById('testTimeUpBtn').disabled = true;
+      sfxWin();
+
+      const eligible = getNonEliminatedPlayers();
+      const pool = eligible.length > 0 ? eligible : activePlayers;
+      const sortedEligible = [...pool].sort((a, b) => b.score - a.score);
+      const topScore = sortedEligible[0].score;
+      const topWinners = sortedEligible.filter(p => p.score === topScore);
+      topWinners.forEach(w => {
+        w.status = 'WINNER';
+        w.turnStatus = 'WINNER';
+      });
+
+      const sortedAll = [...activePlayers].sort((a, b) => {
+        if (a.status === 'ELIMINATED' && b.status !== 'ELIMINATED') return 1;
+        if (b.status === 'ELIMINATED' && a.status !== 'ELIMINATED') return -1;
+        return b.score - a.score;
+      });
+
+      document.getElementById('gameOverBadgeText').textContent = '⏰ Time Complete • Game Over';
+
+      if (topWinners.length === 1) {
+        const winner = topWinners[0];
+        const losers = activePlayers.filter(p => p.id !== winner.id).map(l => l.playerName).join(', ');
+        document.getElementById('winTitle').textContent = `🏆 Winner: ${winner.label}`;
+        document.getElementById('winSub').textContent =
+          `❌ Loser: ${losers} • Time is up! Dice and board are locked.`;
+        document.getElementById('instructionText').textContent =
+          `🛑 Game Over! Winner: ${winner.label} (${winner.score} pts) | Loser: ${losers}. Click Play Game to start a new match.`;
+      } else {
+        const tiedNames = topWinners.map(w => w.label).join(' & ');
+        document.getElementById('winTitle').textContent = `🤝 Tie Match: ${tiedNames}`;
+        document.getElementById('winSub').textContent =
+          `Both finished with ${topScore} points when time ran out!`;
+        document.getElementById('instructionText').textContent =
+          `🛑 Game Over! Tied at ${topScore} points. Click Play Game to start a new match.`;
+      }
+
+      renderWinSummary(sortedAll, topScore);
+      document.getElementById('winModal').classList.remove('hidden');
+      updateUI();
+      drawBoard();
+    }
+
+    function renderWinSummary(sortedPlayers, topScore) {
+      const box = document.getElementById('winScoreSummary');
+
+      box.innerHTML = sortedPlayers.map((p) => {
+        const isEliminated = (p.status === 'ELIMINATED');
+        const isWinner = (p.status === 'WINNER') || (!isEliminated && p.score === topScore && !sortedPlayers.some(x => x.status === 'WINNER'));
+        const homeCount = p.tokens.filter(s => s === 56).length;
+
+        let statusBadge = '';
+        if (isEliminated) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-600/30 border border-rose-500/50 text-rose-200 font-extrabold text-[10px]">🚫 ELIMINATED (${p.missedTurns}/3)</span>`;
+        } else if (isWinner) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold text-[10px]">🏆 WINNER</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-extrabold text-[10px]">❌ LOSER</span>`;
+        }
+
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-xl border ${isWinner ? 'border-emerald-500/50 bg-emerald-950/30' : 'border-rose-500/30 bg-slate-950/80'}">
+            <div class="flex items-center gap-2 min-w-0 text-left">
+              <span class="w-3.5 h-3.5 rounded-full shrink-0" style="background:${p.hex}"></span>
+              <div class="truncate">
+                <div class="font-bold text-white text-xs truncate">${p.label}</div>
+                <div class="text-[10px] text-slate-400">🏠 ${homeCount}/4 Home • Chances: ${p.remainingChances}/${MAX_MISSED_CHANCES}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              ${statusBadge}
+              <span class="font-extrabold text-amber-400 text-xs sm:text-sm min-w-[48px] text-right">${p.score} pts</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function currentPlayer() {
+      return activePlayers[turnIndex];
+    }
+
+    function getGlobalTrackIndex(player, step) {
+      if (step < 0 || step > 50) return -1;
+      return (player.startOffset + step) % 52;
+    }
+
+    function getStepGridCoord(player, tokenIdx, stepVal) {
+      if (stepVal === -1) {
+        return player.yardCenters[tokenIdx];
+      }
+      if (stepVal >= 0 && stepVal <= 50) {
+        const globalIdx = getGlobalTrackIndex(player, stepVal);
+        const [c, r] = MAIN_TRACK[globalIdx];
+        return [c + 0.5, r + 0.5];
+      }
+      if (stepVal >= 51 && stepVal <= 55) {
+        const stretchIdx = stepVal - 51;
+        const [c, r] = player.homeStretch[stretchIdx];
+        return [c + 0.5, r + 0.5];
+      }
+      const [hc, hr] = player.homeGoal;
+      const offsets = [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]];
+      return [hc + offsets[tokenIdx][0], hr + offsets[tokenIdx][1]];
+    }
+
+    function getTokenGridCenter(player, tokenIdx) {
+      if (
+        movingAnim &&
+        movingAnim.playerId === player.id &&
+        movingAnim.tokenIdx === tokenIdx
+      ) {
+        const [fx, fy] = movingAnim.fromCoord;
+        const [tx, ty] = movingAnim.toCoord;
+        const t = movingAnim.progress;
+        return [fx + (tx - fx) * t, fy + (ty - fy) * t];
+      }
+      return getStepGridCoord(player, tokenIdx, player.tokens[tokenIdx]);
+    }
+
+    function getMovableTokens(player, roll) {
+      if (!player || player.status !== 'ACTIVE') return [];
+      const movable = [];
+      player.tokens.forEach((step, idx) => {
+        if (step === -1) {
+          movable.push(idx);
+        } else if (step + roll <= 56) {
+          movable.push(idx);
+        }
+      });
+      return movable;
+    }
+
+    function addFloatingPopup(text, gridX, gridY, color) {
+      floatingPopups.push({
+        text,
+        gx: gridX,
+        gy: gridY,
+        color,
+        alpha: 1.0,
+        offsetY: 0
+      });
+    }
+
+    // =========================================================================
+    // 5. ATOMIC DICE ROLL & TOKEN MOVEMENT LOGIC
+    // =========================================================================
+    function handleRollDice(forcedRollValue = null) {
+      if (phase !== 'ROLL' || remainingSeconds <= 0 || isGamePaused) return false;
+      const player = currentPlayer();
+      if (!player || player.status !== 'ACTIVE') return false;
+      if (player.isBot && botTimer === null && forcedRollValue === null) return false;
+
+      const thisTurnId = currentTurnId;
+      if (hasRolledThisTurn || resolvedTurnIds.has(thisTurnId)) return false;
+
+      hasRolledThisTurn = true;
+      resolvedTurnIds.add(thisTurnId);
+      player.turnStatus = 'ROLLED';
+
+      stopTurnTimer();
+
+      if (botTimer) {
+        clearTimeout(botTimer);
+        botTimer = null;
+      }
+
+      sfxRoll();
+      document.getElementById('bonusRollHint').classList.add('hidden');
+      const diceBtn = document.getElementById('diceBtn');
+      const centerDiceBtn = document.getElementById('centerDiceBtn');
+      const topDiceBtn = document.getElementById('topOpponentDiceBtn');
+      if (player.id === 0) {
+        diceBtn.classList.add('dice-rolling');
+      } else {
+        topDiceBtn.classList.add('dice-rolling');
+      }
+      centerDiceBtn.classList.add('dice-rolling');
+
+      diceValue = (forcedRollValue !== null)
+        ? forcedRollValue
+        : (Math.floor(Math.random() * 6) + 1);
+      renderDiceFace(diceValue);
+      appendTurnLog(`🎲 ${player.playerName} rolled ${diceValue}.`);
+      updateUI();
+
+      rollTimer = setTimeout(() => {
+        rollTimer = null;
+        diceBtn.classList.remove('dice-rolling');
+        centerDiceBtn.classList.remove('dice-rolling');
+        topDiceBtn.classList.remove('dice-rolling');
+        if (phase === 'GAME_OVER' || currentTurnId !== thisTurnId) return;
+
+        validTokenIndices = getMovableTokens(player, diceValue);
+
+        if (validTokenIndices.length === 0) {
+          document.getElementById('lastRollText').textContent = `Rolled ${diceValue}`;
+          document.getElementById('instructionText').textContent = `${player.label} rolled a ${diceValue}, but no tokens can move. Switching turns...`;
+          phase = 'BOT_WAIT';
+          updateUI();
+          botTimer = setTimeout(() => {
+            if (phase === 'GAME_OVER') return;
+            nextTurn();
+          }, 900);
+          return;
+        }
+
+        phase = 'MOVE';
+        updateUI();
+
+        if (player.isBot) {
+          botTimer = setTimeout(() => {
+            if (phase === 'GAME_OVER') return;
+            const chosenIdx = chooseBotMove(player, validTokenIndices, diceValue);
+            executeTokenMove(chosenIdx);
+          }, 550);
+        }
+      }, 240);
+
+      return true;
+    }
+
+    function chooseBotMove(player, movableIndices, roll) {
+      let bestIdx = movableIndices[0];
+      let bestScore = -999;
+
+      for (const idx of movableIndices) {
+        const curStep = player.tokens[idx];
+        const nextStep = curStep === -1 ? roll : curStep + roll;
+        let score = nextStep;
+
+        if (nextStep === 56) score += 220;
+
+        if (nextStep <= 50) {
+          const targetGlobal = getGlobalTrackIndex(player, nextStep);
+          if (!SAFE_INDICES.has(targetGlobal)) {
+            for (const other of activePlayers) {
+              if (other.id === player.id || other.status !== 'ACTIVE') continue;
+              const oppCount = other.tokens.filter(s => getGlobalTrackIndex(other, s) === targetGlobal).length;
+              if (oppCount === 1) score += 320;
+            }
+          }
+          if (SAFE_INDICES.has(targetGlobal)) score += 45;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = idx;
+        }
+      }
+      return bestIdx;
+    }
+
+    function executeTokenMove(tokenIdx, instantForTest = false) {
+      if (phase !== 'MOVE' || !validTokenIndices.includes(tokenIdx)) return false;
+
+      const player = currentPlayer();
+      if (!player || player.status !== 'ACTIVE') return false;
+
+      const startStep = player.tokens[tokenIdx] === -1 ? 0 : player.tokens[tokenIdx];
+      const targetStep = Math.min(56, startStep + diceValue);
+
+      phase = 'ANIMATING';
+      validTokenIndices = [];
+      updateUI();
+
+      if (instantForTest) {
+        finalizeTokenLanding(player, tokenIdx, targetStep, targetStep - startStep);
+        return true;
+      }
+
+      const stepSequence = [];
+      for (let s = startStep + 1; s <= targetStep; s++) {
+        stepSequence.push(s);
+      }
+
+      let seqIdx = 0;
+      const hopDurationMs = 110;
+      let subFrame = 0;
+      const subSteps = 5;
+
+      let prevStep = startStep;
+
+      hopInterval = setInterval(() => {
+        if (phase === 'GAME_OVER') {
+          clearInterval(hopInterval);
+          hopInterval = null;
+          movingAnim = null;
+          return;
+        }
+
+        if (seqIdx >= stepSequence.length) {
+          clearInterval(hopInterval);
+          hopInterval = null;
+          movingAnim = null;
+          finalizeTokenLanding(player, tokenIdx, targetStep, targetStep - startStep);
+          return;
+        }
+
+        const nextStepVal = stepSequence[seqIdx];
+        const fromCoord = getStepGridCoord(player, tokenIdx, prevStep);
+        const toCoord = getStepGridCoord(player, tokenIdx, nextStepVal);
+
+        subFrame++;
+        const progress = subFrame / subSteps;
+        movingAnim = {
+          playerId: player.id,
+          tokenIdx,
+          fromCoord,
+          toCoord,
+          progress
+        };
+
+        if (subFrame === 1) {
+          sfxHop(seqIdx);
+        }
+
+        drawBoard();
+
+        if (subFrame >= subSteps) {
+          player.tokens[tokenIdx] = nextStepVal;
+          recalcPlayerScore(player);
+          prevStep = nextStepVal;
+          seqIdx++;
+          subFrame = 0;
+          updateUI();
+        }
+      }, hopDurationMs / subSteps);
+
+      return true;
+    }
+
+    function finalizeTokenLanding(player, tokenIdx, finalStep, stepsMoved) {
+      if (phase === 'GAME_OVER') return;
+
+      player.tokens[tokenIdx] = finalStep;
+      const [landX, landY] = getStepGridCoord(player, tokenIdx, finalStep);
+
+      let capturedOpponent = false;
+      const reachedHome = (finalStep === 56);
+
+      if (finalStep >= 0 && finalStep <= 50) {
+        const targetGlobal = getGlobalTrackIndex(player, finalStep);
+        if (!SAFE_INDICES.has(targetGlobal)) {
+          for (const other of activePlayers) {
+            if (other.id === player.id || other.status !== 'ACTIVE') continue;
+            const matchingIndices = [];
+            other.tokens.forEach((s, oIdx) => {
+              if (getGlobalTrackIndex(other, s) === targetGlobal) {
+                matchingIndices.push(oIdx);
+              }
+            });
+            if (matchingIndices.length === 1) {
+              other.tokens[matchingIndices[0]] = 0;
+              recalcPlayerScore(other);
+              capturedOpponent = true;
+            }
+          }
+        }
+      }
+
+      if (capturedOpponent) {
+        player.capturePoints += 20;
+        sfxCapture();
+        addFloatingPopup(`+${stepsMoved + 20} PTS`, landX, landY, '#facc15');
+      } else if (reachedHome) {
+        player.homeBonusPoints += 56;
+        sfxHomeBonus();
+        addFloatingPopup(`+${stepsMoved + 56} PTS`, landX, landY, '#34d399');
+      } else {
+        addFloatingPopup(`+${stepsMoved}`, landX, landY, '#ffffff');
+      }
+
+      recalcPlayerScore(player);
+
+      if (player.tokens.every(s => s === 56)) {
+        clearTimers();
+        phase = 'GAME_OVER';
+        player.status = 'WINNER';
+        player.turnStatus = 'WINNER';
+        document.getElementById('testTimeUpBtn').disabled = true;
+        sfxWin();
+        const sorted = [...activePlayers].sort((a, b) => {
+          if (a.status === 'WINNER') return -1;
+          if (b.status === 'WINNER') return 1;
+          return b.score - a.score;
+        });
+        const losers = sorted.filter(p => p.id !== player.id).map(l => l.playerName).join(', ');
+        document.getElementById('gameOverBadgeText').textContent = '🏠 All Tokens Home • Game Over';
+        document.getElementById('winTitle').textContent = `🏆 Winner: ${player.label}`;
+        document.getElementById('winSub').textContent = `❌ Loser: ${losers} • All 4 tokens reached Home (${player.score} pts)!`;
+        renderWinSummary(sorted, player.score);
+        document.getElementById('winModal').classList.remove('hidden');
+        appendTurnLog(`🏆 ${player.playerName} completed all 4 tokens Home and won!`);
+        updateUI();
+        drawBoard();
+        return;
+      }
+
+      const getsBonusTurn = (diceValue === 6 || capturedOpponent || reachedHome);
+      if (getsBonusTurn && player.status === 'ACTIVE') {
+        document.getElementById('bonusRollHint').classList.remove('hidden');
+        const reason = capturedOpponent ? 'captured a token (+20 pts)' : (reachedHome ? 'reached Home (+56 pts)' : 'rolled a 6');
+        appendTurnLog(`✨ ${player.playerName} ${reason} -> Bonus Turn!`);
+        beginTurnForIndex(turnIndex, true);
+      } else {
+        nextTurn();
+      }
+    }
+
+    function nextTurn() {
+      if (phase === 'GAME_OVER') return;
+      const nextIdx = findNextActivePlayerIndex(turnIndex);
+      if (nextIdx === -1) {
+        endGameByTimer();
+        return;
+      }
+      beginTurnForIndex(nextIdx, false);
+    }
+
+    // =========================================================================
+    // 6. UI UPDATES & DICE POD SVG RENDERING
+    // =========================================================================
+    function renderDiceFace(val) {
+      const pipCoords = {
+        1: [[50, 50]],
+        2: [[28, 28], [72, 72]],
+        3: [[25, 25], [50, 50], [75, 75]],
+        4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+        5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
+        6: [[28, 24], [72, 24], [28, 50], [72, 50], [28, 76], [72, 76]]
+      };
+
+      const curP = currentPlayer();
+      if (!hasRolledThisTurn && phase === 'ROLL') {
+        // Show the Pawn + Dice Idle Icon inside the Dice Pod before rolling (just like reference screenshots!)
+        const idleIconSvg = `
+          <rect x="44" y="22" width="38" height="38" rx="8" fill="none" stroke="#ffffff" stroke-width="5" transform="rotate(18 63 41)" />
+          <circle cx="63" cy="41" r="4.5" fill="#ffffff" />
+          <circle cx="34" cy="36" r="9" fill="#ffffff" />
+          <path d="M20 68 C20 50, 48 50, 48 68 Z" fill="#ffffff" />
+          <rect x="16" y="68" width="36" height="6" rx="3" fill="#ffffff" />
+        `;
+        document.getElementById('diceSvg').innerHTML = idleIconSvg;
+        document.getElementById('topDiceSvg').innerHTML = idleIconSvg;
+        document.getElementById('centerDiceSvg').innerHTML = idleIconSvg;
+        return;
+      }
+
+      const pips = (pipCoords[val] || pipCoords[6])
+        .map(([cx, cy]) => `<circle cx="${cx}" cy="${cy}" r="9.5" fill="#1e293b" />`)
+        .join('');
+      const diceCubeSvg = `<rect x="8" y="8" width="84" height="84" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="4" />${pips}`;
+
+      document.getElementById('diceSvg').innerHTML = diceCubeSvg;
+      document.getElementById('topDiceSvg').innerHTML = diceCubeSvg;
+      document.getElementById('centerDiceSvg').innerHTML = diceCubeSvg;
+    }
+
+    function updateUI() {
+      const player = currentPlayer();
+      const isGameOver = (phase === 'GAME_OVER');
+      const canHumanRoll = (
+        phase === 'ROLL' &&
+        player &&
+        player.status === 'ACTIVE' &&
+        !player.isBot &&
+        !hasRolledThisTurn &&
+        !isGameOver &&
+        !isGamePaused
+      );
+
+      const turnDot = document.getElementById('turnDot');
+      turnDot.style.backgroundColor = isGameOver ? '#ef4444' : player.hex;
+      turnDot.style.boxShadow = isGameOver ? '0 0 12px #ef4444' : `0 0 12px ${player.hex}`;
+      document.getElementById('turnName').textContent = isGameOver ? 'Match Ended' : player.label;
+
+      // Update Bottom ("You" / Player 0) and Top (Opponent) HUDs
+      const bottomPlayer = activePlayers[0];
+      const topPlayer = activePlayers.find(p => p.id === 2) || activePlayers[1];
+      if (bottomPlayer) {
+        document.getElementById('bottomPlayerNamePill').textContent =
+          bottomPlayer.playerName === 'Vijay' ? 'You (Vijay)' : bottomPlayer.playerName;
+        renderChanceDots('bottomChanceDots', bottomPlayer.remainingChances);
+      }
+      if (topPlayer) {
+        document.getElementById('topPlayerNamePill').textContent = topPlayer.playerName;
+        renderChanceDots('topChanceDots', topPlayer.remainingChances);
+      }
+
+      // Show bouncing green arrow when it is human's turn to roll
+      const greenArrow = document.getElementById('greenTurnArrow');
+      if (greenArrow) {
+        greenArrow.classList.toggle('hidden', !canHumanRoll);
+      }
+
+      const chancesBadge = document.getElementById('activeChancesBadge');
+      if (player) {
+        chancesBadge.textContent = `Chances: ${player.remainingChances}/${MAX_MISSED_CHANCES}`;
+      }
+
+      const centerDiceBtn = document.getElementById('centerDiceBtn');
+      const diceBtn = document.getElementById('diceBtn');
+      const topOpponentDiceBtn = document.getElementById('topOpponentDiceBtn');
+      const rollActionBtn = document.getElementById('rollActionBtn');
+      const sidePlayGameBtn = document.getElementById('sidePlayGameBtn');
+
+      centerDiceBtn.disabled = !canHumanRoll;
+      diceBtn.disabled = !canHumanRoll;
+      rollActionBtn.disabled = !canHumanRoll;
+      if (topOpponentDiceBtn) {
+        topOpponentDiceBtn.disabled = !canHumanRoll;
+      }
+
+      sidePlayGameBtn.classList.toggle('hidden', !isGameOver);
+
+      const centerDiceTag = document.getElementById('centerDiceTag');
+      if (isGameOver) {
+        centerDiceTag.textContent = 'LOCKED';
+      } else {
+        centerDiceTag.textContent = phase === 'ROLL' ? (player.isBot ? 'BOT' : 'ROLL') : `+${diceValue}`;
+      }
+
+      const statusBadge = document.getElementById('statusBadge');
+      if (isGameOver) {
+        statusBadge.textContent = '🛑 Game Over • Dice Locked';
+        statusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40';
+      } else if (isGamePaused) {
+        statusBadge.textContent = '⏸ Game Paused';
+        statusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      } else if (phase === 'ROLL') {
+        statusBadge.textContent = player.isBot ? 'Bot Rolling...' : 'Tap Dice Pod';
+        statusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      } else if (phase === 'MOVE') {
+        statusBadge.textContent = player.isBot ? 'Bot Moving...' : `Move a Pawn (+${diceValue})`;
+        statusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      } else if (phase === 'ANIMATING') {
+        statusBadge.textContent = 'Hopping...';
+        statusBadge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40';
+      }
+
+      document.getElementById('lastRollText').textContent = isGameOver ? 'Match Complete' : `Dice: ${diceValue}`;
+
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`tokenBtn${i}`);
+        const step = player.tokens[i];
+        let stateLabel = 'Start';
+        if (step > 0 && step <= 50) stateLabel = `${step} pts`;
+        else if (step >= 51 && step <= 55) stateLabel = `Stretch`;
+        else if (step === 56) stateLabel = 'Home ✓';
+
+        btn.textContent = `#${i + 1} (${stateLabel})`;
+        const canClickToken = (!isGameOver && !isGamePaused && phase === 'MOVE' && !player.isBot && validTokenIndices.includes(i));
+        btn.disabled = !canClickToken;
+      }
+
+      const sb = document.getElementById('scoreboardGrid');
+      const eligibleScores = activePlayers.filter(p => p.status !== 'ELIMINATED').map(p => p.score);
+      const maxScore = eligibleScores.length > 0 ? Math.max(...eligibleScores) : 0;
+
+      sb.innerHTML = activePlayers.map((p, idx) => {
+        const homeCount = p.tokens.filter(s => s === 56).length;
+        const isCurrent = (!isGameOver && idx === turnIndex && p.status === 'ACTIVE');
+        const isEliminated = (p.status === 'ELIMINATED');
+
+        let statusPill = '';
+        if (isEliminated) {
+          statusPill = `<span class="px-1.5 py-0.5 rounded bg-rose-600/30 text-rose-300 text-[9px] font-extrabold">🚫 ELIMINATED (3/3)</span>`;
+        } else if (isGameOver) {
+          const isWin = (p.status === 'WINNER') || (p.score === maxScore && !activePlayers.some(x => x.status === 'WINNER'));
+          statusPill = isWin
+            ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-extrabold">🏆 WINNER</span>`
+            : `<span class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[9px] font-extrabold">❌ LOSER</span>`;
+        } else if (isCurrent) {
+          statusPill = `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-extrabold">● ON TURN</span>`;
+        } else {
+          statusPill = `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] font-semibold">ACTIVE</span>`;
+        }
+
+        return `
+          <div class="p-2 rounded-xl border ${isEliminated ? 'border-rose-900/50 bg-slate-950/40 opacity-60' : (isCurrent ? 'border-amber-400/80 bg-slate-800/90' : 'border-slate-800 bg-slate-950/60')} flex items-center justify-between">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${p.hex}"></span>
+                <span class="text-xs font-bold text-white truncate">${p.label}</span>
+                ${statusPill}
+              </div>
+              <div class="text-[10px] text-slate-300 mt-0.5">
+                Chances: <strong>${p.remainingChances}/3</strong> (Missed: ${p.missedTurns}/3) • 🏠 ${homeCount}/4
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-1">
+              <div class="text-sm font-extrabold text-amber-400">${p.score}</div>
+              <div class="text-[9px] uppercase text-slate-400">Score</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateTurnTimerUI();
+      renderDiceFace(diceValue);
+    }
+
+    // =========================================================================
+    // 7. CANVAS BOARD (MATCHING REFERENCE SCREENSHOTS) & 3D PAWN RENDERING
+    // =========================================================================
+    function resizeCanvas() {
+      const container = document.getElementById('boardContainer');
+      const rect = container.getBoundingClientRect();
+      const size = Math.max(260, Math.floor(Math.min(rect.width, rect.height) - 16));
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawBoard();
+    }
+
+    function drawStar(cx, cy, outerR, innerR, color) {
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawDirectionalTriangle(cx, cy, sizeR, dir, color) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      if (dir === 'down') ctx.rotate(Math.PI / 2);
+      else if (dir === 'left') ctx.rotate(Math.PI);
+      else if (dir === 'up') ctx.rotate(-Math.PI / 2);
+
+      ctx.beginPath();
+      ctx.moveTo(sizeR, 0);
+      ctx.lineTo(-sizeR * 0.75, -sizeR * 0.8);
+      ctx.lineTo(-sizeR * 0.75, sizeR * 0.8);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draws a 3D glossy Ludo pawn matching the reference screenshots
+    function drawPawnToken(drawX, drawY, cell, player, tokenIdx, scaleBoost, isMovable) {
+      ctx.save();
+      if (player.status === 'ELIMINATED') {
+        ctx.globalAlpha = 0.35;
+      }
+
+      if (isMovable) {
+        const pulseR = cell * (0.45 + 0.08 * Math.sin(pulseFrame * 0.14));
+        ctx.beginPath();
+        ctx.arc(drawX, drawY + cell * 0.06, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(drawX, drawY + cell * 0.06, pulseR + 2.5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+
+      const s = cell * scaleBoost;
+
+      // Drop shadow under pawn base
+      ctx.beginPath();
+      ctx.ellipse(drawX, drawY + s * 0.22, s * 0.31, s * 0.14, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.fill();
+
+      // Pawn lower base rim
+      ctx.beginPath();
+      ctx.ellipse(drawX, drawY + s * 0.17, s * 0.28, s * 0.12, 0, 0, Math.PI * 2);
+      ctx.fillStyle = player.darkHex;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#1e293b';
+      ctx.stroke();
+
+      // Pawn middle ring
+      ctx.beginPath();
+      ctx.ellipse(drawX, drawY + s * 0.08, s * 0.23, s * 0.1, 0, 0, Math.PI * 2);
+      ctx.fillStyle = player.hex;
+      ctx.fill();
+      ctx.stroke();
+
+      // Pawn tapered cone body
+      ctx.beginPath();
+      ctx.moveTo(drawX - s * 0.2, drawY + s * 0.07);
+      ctx.quadraticCurveTo(drawX - s * 0.11, drawY - s * 0.15, drawX - s * 0.09, drawY - s * 0.22);
+      ctx.lineTo(drawX + s * 0.09, drawY - s * 0.22);
+      ctx.quadraticCurveTo(drawX + s * 0.11, drawY - s * 0.15, drawX + s * 0.2, drawY + s * 0.07);
+      ctx.closePath();
+      ctx.fillStyle = player.hex;
+      ctx.fill();
+      ctx.stroke();
+
+      // Pawn spherical top head
+      ctx.beginPath();
+      ctx.arc(drawX, drawY - s * 0.27, s * 0.14, 0, Math.PI * 2);
+      ctx.fillStyle = player.hex;
+      ctx.fill();
+      ctx.stroke();
+
+      // Glossy white highlight on pawn head
+      ctx.beginPath();
+      ctx.arc(drawX - s * 0.04, drawY - s * 0.31, s * 0.045, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawBoard() {
+      const dpr = window.devicePixelRatio || 1;
+      const size = canvas.width / dpr;
+      const cell = size / 15;
+
+      // 1. Dark Teal-Blue Board Background (Visible in the 4 corners around the rounded bases)
+      ctx.fillStyle = '#073b5e';
+      ctx.fillRect(0, 0, size, size);
+
+      // 2. White Cross-Shaped Track Background (cols 6..8 for all rows, rows 6..8 for all cols)
+      ctx.fillStyle = '#ffffff';
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          const inVerticalArm = (c >= 6 && c <= 8);
+          const inHorizontalArm = (r >= 6 && r <= 8);
+          if (inVerticalArm || inHorizontalArm) {
+            ctx.fillRect(c * cell, r * cell, cell, cell);
+          }
+        }
+      }
+
+      // 3. Colored Home Stretch Lanes & Start Squares (Matching Reference Screenshots)
+      // Top-Left Yellow: Start (1,6), Home Stretch row 7, col 1..5
+      ctx.fillStyle = '#f9b208';
+      ctx.fillRect(1 * cell, 6 * cell, cell, cell);
+      for (let c = 1; c <= 5; c++) ctx.fillRect(c * cell, 7 * cell, cell, cell);
+
+      // Top-Right Blue: Start (8,1), Home Stretch col 7, row 1..5
+      ctx.fillStyle = '#2294f2';
+      ctx.fillRect(8 * cell, 1 * cell, cell, cell);
+      for (let r = 1; r <= 5; r++) ctx.fillRect(7 * cell, r * cell, cell, cell);
+
+      // Bottom-Right Red: Start (13,8), Home Stretch row 7, col 9..13
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(13 * cell, 8 * cell, cell, cell);
+      for (let c = 9; c <= 13; c++) ctx.fillRect(c * cell, 7 * cell, cell, cell);
+
+      // Bottom-Left Green: Start (6,13), Home Stretch col 7, row 9..13
+      ctx.fillStyle = '#52b700';
+      ctx.fillRect(6 * cell, 13 * cell, cell, cell);
+      for (let r = 9; r <= 13; r++) ctx.fillRect(7 * cell, r * cell, cell, cell);
+
+      // 4. Grey Star Safe Squares at indices 8 (6,2), 21 (12,6), 34 (8,12), 47 (2,8)
+      STAR_ONLY_INDICES.forEach(idx => {
+        const [c, r] = MAIN_TRACK[idx];
+        ctx.fillStyle = '#b0b7be';
+        ctx.fillRect(c * cell, r * cell, cell, cell);
+        drawStar((c + 0.5) * cell, (r + 0.5) * cell, cell * 0.36, cell * 0.16, '#ffffff');
+      });
+
+      // 5. Directional Entry Triangles on (0,7), (7,0), (14,7), (7,14)
+      drawDirectionalTriangle(0.5 * cell, 7.5 * cell, cell * 0.25, 'right', '#f9b208');
+      drawDirectionalTriangle(7.5 * cell, 0.5 * cell, cell * 0.25, 'down',  '#2294f2');
+      drawDirectionalTriangle(14.5 * cell, 7.5 * cell, cell * 0.25, 'left', '#f43f5e');
+      drawDirectionalTriangle(7.5 * cell, 14.5 * cell, cell * 0.25, 'up',   '#52b700');
+
+      // 6. Track Cell Rounded Borders (Dark Teal Grid Lines like Reference Screenshots)
+      ctx.strokeStyle = '#073b5e';
+      ctx.lineWidth = Math.max(1.5, cell * 0.06);
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          const inVerticalArm = (c >= 6 && c <= 8);
+          const inHorizontalArm = (r >= 6 && r <= 8);
+          const inCenter3x3 = (c >= 6 && c <= 8 && r >= 6 && r <= 8);
+          if ((inVerticalArm || inHorizontalArm) && !inCenter3x3) {
+            ctx.beginPath();
+            ctx.roundRect(c * cell + 0.5, r * cell + 0.5, cell - 1, cell - 1, cell * 0.12);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 7. Draw the 4 Rounded Corner Bases with Large Score Cards Inside!
+      PLAYER_CONFIG.forEach(cfg => {
+        const x = cfg.cornerCol * cell;
+        const y = cfg.cornerRow * cell;
+        const boxSize = 6 * cell;
+        const margin = cell * 0.12;
+
+        // Outer rounded colored base
+        ctx.save();
+        ctx.fillStyle = cfg.hex;
+        ctx.beginPath();
+        ctx.roundRect(x + margin, y + margin, boxSize - margin * 2, boxSize - margin * 2, cell * 1.35);
+        ctx.fill();
+
+        // Inner glossy white rounded square
+        const innerPad = cell * 1.15;
+        const innerX = x + innerPad;
+        const innerY = y + innerPad;
+        const innerW = boxSize - innerPad * 2;
+
+        // Soft shadow under white square
+        ctx.shadowColor = 'rgba(0,0,0,0.28)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+
+        const grad = ctx.createLinearGradient(innerX, innerY, innerX, innerY + innerW);
+        grad.addColorStop(0, '#e2eef8');
+        grad.addColorStop(0.2, '#ffffff');
+        grad.addColorStop(1, '#ffffff');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(innerX, innerY, innerW, innerW, cell * 0.72);
+        ctx.fill();
+        ctx.restore();
+
+        // If this color is an active player in the match, display "First Mover" / "Second Mover" and big Score!
+        const matchingPlayer = activePlayers.find(p => p.id === cfg.id);
+        if (matchingPlayer) {
+          const centerX = x + 3 * cell;
+          const centerY = y + 3 * cell;
+
+          // Mover label on colored border ("First Mover" at top for Blue, "Second Mover" at bottom for Green)
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `600 ${Math.max(9, Math.floor(cell * 0.34))}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const labelY = cfg.moverPos === 'top'
+            ? (y + cell * 0.64)
+            : (y + boxSize - cell * 0.64);
+          ctx.fillText(cfg.moverTitle, centerX, labelY);
+
+          // Huge bold black Score number inside white square
+          ctx.fillStyle = '#090d16';
+          ctx.font = `900 ${Math.max(16, Math.floor(cell * 1.05))}px Inter, sans-serif`;
+          ctx.fillText(String(matchingPlayer.score), centerX, centerY - cell * 0.22);
+
+          // "Score" subtitle below number
+          ctx.fillStyle = '#1e293b';
+          ctx.font = `600 ${Math.max(10, Math.floor(cell * 0.38))}px Inter, sans-serif`;
+          ctx.fillText('Score', centerX, centerY + cell * 0.58);
+        }
+      });
+
+      // 8. Draw Center 3x3 Home Box (Yellow Left, Blue Top, Red Right, Green Bottom)
+      const cx = 7.5 * cell;
+      const cy = 7.5 * cell;
+      const tl = [6 * cell, 6 * cell];
+      const tr = [9 * cell, 6 * cell];
+      const br = [9 * cell, 9 * cell];
+      const bl = [6 * cell, 9 * cell];
+
+      const triangles = [
+        { pts: [tl, bl, [cx, cy]], color: '#f9b208' }, // Yellow Left
+        { pts: [tl, tr, [cx, cy]], color: '#2294f2' }, // Blue Top
+        { pts: [tr, br, [cx, cy]], color: '#f43f5e' }, // Red Right
+        { pts: [bl, br, [cx, cy]], color: '#52b700' }  // Green Bottom
+      ];
+
+      triangles.forEach(t => {
+        ctx.beginPath();
+        ctx.moveTo(t.pts[0][0], t.pts[0][1]);
+        ctx.lineTo(t.pts[1][0], t.pts[1][1]);
+        ctx.lineTo(t.pts[2][0], t.pts[2][1]);
+        ctx.closePath();
+        ctx.fillStyle = t.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      });
+
+      // Rounded white frame around Center 3x3 Home
+      ctx.strokeStyle = '#073b5e';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(6 * cell, 6 * cell, 3 * cell, 3 * cell, cell * 0.25);
+      ctx.stroke();
+
+      // 9. Draw Active Player 3D Pawn Tokens
+      const posMap = new Map();
+      activePlayers.forEach(p => {
+        p.tokens.forEach((step, tIdx) => {
+          const [gc, gr] = getTokenGridCenter(p, tIdx);
+          const isAnimatingThis = (
+            movingAnim &&
+            movingAnim.playerId === p.id &&
+            movingAnim.tokenIdx === tIdx
+          );
+          const key = isAnimatingThis ? `anim_${p.id}_${tIdx}` : `${gc.toFixed(1)},${gr.toFixed(1)}`;
+          if (!posMap.has(key)) posMap.set(key, []);
+          posMap.get(key).push({ player: p, tokenIdx: tIdx, gc, gr, isAnimatingThis });
+        });
+      });
+
+      const curP = currentPlayer();
+      posMap.forEach(group => {
+        group.forEach((item, idxInGroup) => {
+          const { player, tokenIdx, gc, gr, isAnimatingThis } = item;
+          let drawX = gc * cell;
+          let drawY = gr * cell;
+
+          // Fan out clustered pawns on the same tile (just like the 4 pawns on the start square in the screenshots!)
+          if (!isAnimatingThis && group.length > 1 && player.tokens[tokenIdx] !== -1 && player.tokens[tokenIdx] !== 56) {
+            const clusterOffsets = [
+              [-0.18, -0.14],
+              [0.18, -0.14],
+              [-0.18, 0.18],
+              [0.18, 0.18]
+            ];
+            const off = clusterOffsets[idxInGroup % 4];
+            drawX += off[0] * cell;
+            drawY += off[1] * cell;
+          }
+
+          let scaleBoost = group.length > 1 && !isAnimatingThis ? 0.78 : 0.95;
+          if (isAnimatingThis && movingAnim) {
+            const arc = Math.sin(movingAnim.progress * Math.PI);
+            drawY -= arc * (cell * 0.45);
+            scaleBoost = 1.0 + arc * 0.25;
+          }
+
+          const isMovable = (
+            phase === 'MOVE' &&
+            curP &&
+            curP.status === 'ACTIVE' &&
+            !curP.isBot &&
+            player.id === curP.id &&
+            validTokenIndices.includes(tokenIdx)
+          );
+
+          drawPawnToken(drawX, drawY, cell, player, tokenIdx, scaleBoost, isMovable);
+        });
+      });
+
+      // 10. Draw Floating Score Popups (+pts)
+      for (let i = floatingPopups.length - 1; i >= 0; i--) {        const pop = floatingPopups[i];
+        const px = pop.gx * cell;
+        const py = pop.gy * cell - pop.offsetY;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, pop.alpha);
+        ctx.font = `extrabold ${Math.max(11, Math.floor(cell * 0.38))}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3.5;
+        ctx.strokeText(pop.text, px, py);
+        ctx.fillStyle = pop.color;
+        ctx.fillText(pop.text, px, py);
+        ctx.restore();
+      }
+    }
+
+    function startAnimationLoop() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      function tick() {
+        pulseFrame++;
+        let needsRedraw = (phase === 'MOVE' || phase === 'ANIMATING');
+
+        if (floatingPopups.length > 0) {
+          needsRedraw = true;
+          for (let i = floatingPopups.length - 1; i >= 0; i--) {
+            floatingPopups[i].offsetY += 0.6;
+            floatingPopups[i].alpha -= 0.022;
+            if (floatingPopups[i].alpha <= 0) {
+              floatingPopups.splice(i, 1);
+            }
+          }
+        }
+
+        if (needsRedraw) {
+          drawBoard();
+        }
+        animFrameId = requestAnimationFrame(tick);
+      }
+      animFrameId = requestAnimationFrame(tick);
+    }
+
+
+    // =========================================================================
+    // ONLINE MULTIPLAYER (host-authoritative WebRTC via PeerJS)
+    // =========================================================================
+    let onlineRole = 'offline'; // offline | host | client
+    let onlinePeer = null;
+    let onlineHostConnection = null;
+    let onlineSeat = 0;
+    let onlineRoomCode = '';
+    let onlineSyncInterval = null;
+    const onlinePeerConnections = new Map();
+    const onlineSeatByPeer = new Map();
+    const localHandleRollDice = handleRollDice;
+    const localExecuteTokenMove = executeTokenMove;
+
+    function setOnlineStatus(message, tone = 'neutral') {
+      const el = document.getElementById('onlineStatus');
+      if (!el) return;
+      el.textContent = message;
+      el.className = 'rounded-full border px-2 py-1 text-[10px] font-bold ' +
+        (tone === 'good' ? 'border-emerald-300/30 bg-emerald-950/60 text-emerald-200' :
+         tone === 'bad' ? 'border-rose-300/30 bg-rose-950/60 text-rose-200' :
+         'border-white/15 bg-slate-900/70 text-slate-200');
+    }
+
+    function showOnlineRoom(code, message) {
+      const info = document.getElementById('onlineRoomInfo');
+      info.classList.remove('hidden');
+      info.innerHTML = '<div class="font-extrabold tracking-widest text-base">' + code + '</div><div class="mt-1">' + message + '</div>';
+    }
+
+    function getOnlineSnapshot() {
+      return {
+        type: 'snapshot',
+        players: activePlayers.map(p => ({ ...p })),
+        turnIndex, diceValue, phase, validTokenIndices: [...validTokenIndices],
+        remainingSeconds, turnRemainingMs, isTurnTimerRunning, isGamePaused,
+        currentTurnId, hasRolledThisTurn, selectedMinutes, turnDurationSeconds,
+        resolvedTurnIds: [...resolvedTurnIds], turnLogs: [...turnLogs]
+      };
+    }
+
+    function applyOnlineSnapshot(data) {
+      if (!data || !Array.isArray(data.players) || !data.players.length) return;
+      activePlayers = data.players.map(p => ({ ...p }));
+      turnIndex = Number(data.turnIndex) || 0;
+      diceValue = Number(data.diceValue) || 1;
+      phase = data.phase || 'ROLL';
+      validTokenIndices = Array.isArray(data.validTokenIndices) ? [...data.validTokenIndices] : [];
+      remainingSeconds = Number.isFinite(data.remainingSeconds) ? data.remainingSeconds : remainingSeconds;
+      turnRemainingMs = Number.isFinite(data.turnRemainingMs) ? data.turnRemainingMs : turnRemainingMs;
+      isTurnTimerRunning = !!data.isTurnTimerRunning;
+      isGamePaused = !!data.isGamePaused;
+      currentTurnId = Number(data.currentTurnId) || 0;
+      hasRolledThisTurn = !!data.hasRolledThisTurn;
+      selectedMinutes = Number(data.selectedMinutes) || selectedMinutes;
+      turnDurationSeconds = Number(data.turnDurationSeconds) || turnDurationSeconds;
+      resolvedTurnIds = new Set(data.resolvedTurnIds || []);
+      if (Array.isArray(data.turnLogs)) {
+        turnLogs = [...data.turnLogs];
+        const logBox = document.getElementById('turnHistoryLog');
+        if (logBox) logBox.innerHTML = turnLogs.map(line => '<div>' + String(line).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
+      }
+      updateTimerDisplay();
+      updateTurnTimerUI();
+      updateUI();
+      drawBoard();
+    }
+
+    function setOnlinePlayerName(seat, name) {
+      if (!activePlayers[seat]) return;
+      const safeName = String(name || '').trim().slice(0, 18);
+      if (!safeName) return;
+      activePlayers[seat].playerName = safeName;
+      activePlayers[seat].isBot = false;
+      activePlayers[seat].label = safeName + ' (' + activePlayers[seat].name + ')';
+    }
+
+    function broadcastOnlineSnapshot() {
+      if (onlineRole !== 'host') return;
+      const snapshot = getOnlineSnapshot();
+      onlinePeerConnections.forEach(conn => {
+        if (conn.open) {
+          try { conn.send(snapshot); } catch (e) { /* connection may be closing */ }
+        }
+      });
+    }
+
+    function disconnectOnline(silent = false) {
+      if (onlineSyncInterval) clearInterval(onlineSyncInterval);
+      onlineSyncInterval = null;
+      onlinePeerConnections.forEach(conn => { try { conn.close(); } catch (e) {} });
+      onlinePeerConnections.clear();
+      onlineSeatByPeer.clear();
+      if (onlineHostConnection) {
+        try { onlineHostConnection.close(); } catch (e) {}
+      }
+      onlineHostConnection = null;
+      if (onlinePeer) {
+        try { onlinePeer.destroy(); } catch (e) {}
+      }
+      onlinePeer = null;
+      onlineRole = 'offline';
+      onlineSeat = 0;
+      onlineRoomCode = '';
+      document.getElementById('onlineRoomJoinRow').classList.add('hidden');
+      document.getElementById('onlineRoomInfo').classList.add('hidden');
+      document.getElementById('leaveOnlineRoomBtn').classList.add('hidden');
+      document.getElementById('createOnlineRoomBtn').disabled = false;
+      document.getElementById('joinOnlineRoomBtn').disabled = false;
+      setOnlineStatus('Offline');
+      if (!silent) showTurnNotification('Disconnected from the online room.', 'Online', 'warn');
+    }
+
+    function acceptOnlineConnection(conn) {
+      onlinePeerConnections.set(conn.peer, conn);
+      conn.on('data', data => {
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'join') {
+          if (onlineSeatByPeer.has(conn.peer)) return;
+          const seat = activePlayers.findIndex((p, idx) => idx > 0 && !onlineSeatByPeerHasSeat(idx));
+          if (seat < 0) {
+            conn.send({ type: 'room_full' });
+            return;
+          }
+          onlineSeatByPeer.set(conn.peer, seat);
+          setOnlinePlayerName(seat, data.name || ('Player ' + (seat + 1)));
+          if (onlineSeatByPeer.size + 1 >= activePlayers.length && isGamePaused) {
+            isGamePaused = false;
+            beginTurnForIndex(0);
+          }
+          conn.send({ type: 'welcome', seat, snapshot: getOnlineSnapshot() });
+          setOnlineStatus(onlineSeatByPeer.size + 1 >= activePlayers.length ? 'Match ready' : 'Waiting for players', 'good');
+          showOnlineRoom(onlineRoomCode.toUpperCase(), (onlineSeatByPeer.size + 1) + ' of ' + activePlayers.length + ' player(s) connected. The match starts when all seats join.');
+          broadcastOnlineSnapshot();
+          updateUI();
+          drawBoard();
+          return;
+        }
+        const seat = onlineSeatByPeer.get(conn.peer);
+        if (seat === undefined) return;
+        if (data.type === 'roll' && seat === turnIndex && phase === 'ROLL' && !isGamePaused) {
+          localHandleRollDice();
+          broadcastOnlineSnapshot();
+        } else if (data.type === 'move' && seat === turnIndex && phase === 'MOVE' &&
+                   Number.isInteger(data.tokenIdx) && validTokenIndices.includes(data.tokenIdx) && !isGamePaused) {
+          localExecuteTokenMove(data.tokenIdx);
+          broadcastOnlineSnapshot();
+        } else if (data.type === 'new_game') {
+          setupGame();
+          broadcastOnlineSnapshot();
+        }
+      });
+      conn.on('close', () => {
+        onlinePeerConnections.delete(conn.peer);
+        onlineSeatByPeer.delete(conn.peer);
+        setOnlineStatus('Room active', 'good');
+        broadcastOnlineSnapshot();
+      });
+      conn.on('error', () => setOnlineStatus('Connection issue', 'bad'));
+    }
+
+    function onlineSeatByPeerHasSeat(seat) {
+      for (const assigned of onlineSeatByPeer.values()) if (assigned === seat) return true;
+      return false;
+    }
+
+    function connectToHost(roomCode) {
+      if (typeof Peer === 'undefined') {
+        setOnlineStatus('PeerJS failed to load', 'bad');
+        return;
+      }
+      disconnectOnline(true);
+      onlineRole = 'client';
+      onlineRoomCode = roomCode.toLowerCase();
+      onlinePeer = new Peer();
+      onlinePeer.on('open', () => {
+        onlineHostConnection = onlinePeer.connect('ludo-' + onlineRoomCode, { reliable: true });
+        onlineHostConnection.on('open', () => {
+          onlineHostConnection.send({ type: 'join', name: document.getElementById('onlineName').value || 'Player' });
+          setOnlineStatus('Connecting…');
+        });
+        onlineHostConnection.on('data', data => {
+          if (!data || typeof data !== 'object') return;
+          if (data.type === 'welcome') {
+            onlineSeat = data.seat;
+            clearTimers();
+            onlineRole = 'client';
+            document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+            document.getElementById('createOnlineRoomBtn').disabled = true;
+            document.getElementById('joinOnlineRoomBtn').disabled = true;
+            document.getElementById('onlineRoomJoinRow').classList.add('hidden');
+            setOnlineStatus('Connected · Seat ' + (onlineSeat + 1), 'good');
+            showOnlineRoom(onlineRoomCode.toUpperCase(), 'Connected. Your board will update automatically.');
+            applyOnlineSnapshot(data.snapshot);
+          } else if (data.type === 'snapshot') {
+            applyOnlineSnapshot(data);
+          } else if (data.type === 'room_full') {
+            setOnlineStatus('Room is full', 'bad');
+            showTurnNotification('This room already has all player seats filled.', 'Room Full', 'warn');
+          }
+        });
+        onlineHostConnection.on('close', () => {
+          clearTimers();
+          setOnlineStatus('Host disconnected', 'bad');
+        });
+        onlineHostConnection.on('error', () => setOnlineStatus('Could not connect', 'bad'));
+      });
+      onlinePeer.on('error', err => {
+        setOnlineStatus(err && err.type === 'peer-unavailable' ? 'Room not found' : 'Connection error', 'bad');
+      });
+      document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+    }
+
+    function createOnlineRoom() {
+      if (typeof Peer === 'undefined') {
+        setOnlineStatus('PeerJS failed to load', 'bad');
+        return;
+      }
+      disconnectOnline(true);
+      onlineRole = 'host';
+      onlineSeat = 0;
+      onlineRoomCode = Math.random().toString(36).slice(2, 8).padEnd(6, 'x').slice(0, 6).toLowerCase();
+      const peerId = 'ludo-' + onlineRoomCode;
+      onlinePeer = new Peer(peerId);
+      onlinePeer.on('open', () => {
+        const seatCount = document.getElementById('onlineSeatCount').value;
+        gameMode = seatCount === '4' ? '4p_human' : '2p_human';
+        setupGame();
+        setOnlinePlayerName(0, document.getElementById('onlineName').value || 'Host');
+        isGamePaused = true;
+        stopTurnTimer();
+        updateUI();
+        drawBoard();
+        document.getElementById('leaveOnlineRoomBtn').classList.remove('hidden');
+        document.getElementById('createOnlineRoomBtn').disabled = true;
+        document.getElementById('joinOnlineRoomBtn').disabled = true;
+        setOnlineStatus('Room created', 'good');
+        showOnlineRoom(onlineRoomCode.toUpperCase(), 'Waiting for other players. Share this 6-character code.');
+        onlineSyncInterval = setInterval(broadcastOnlineSnapshot, 300);
+      });
+      onlinePeer.on('connection', acceptOnlineConnection);
+      onlinePeer.on('error', err => {
+        setOnlineStatus(err && err.type === 'unavailable-id' ? 'Room code collision — create again' : 'Peer connection error', 'bad');
+        if (onlinePeer) { try { onlinePeer.destroy(); } catch (e) {} }
+        onlinePeer = null;
+        onlineRole = 'offline';
+        document.getElementById('createOnlineRoomBtn').disabled = false;
+        document.getElementById('joinOnlineRoomBtn').disabled = false;
+      });
+    }
+
+    function requestOnlineNewGame() {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'new_game' });
+        return;
+      }
+      setupGame();
+      broadcastOnlineSnapshot();
+    }
+
+    handleRollDice = function() {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'roll' });
+        return;
+      }
+      if (onlineRole === 'host' && turnIndex !== onlineSeat) return;
+      return localHandleRollDice();
+    };
+
+    executeTokenMove = function(tokenIdx) {
+      if (onlineRole === 'client') {
+        if (onlineHostConnection && onlineHostConnection.open) onlineHostConnection.send({ type: 'move', tokenIdx });
+        return;
+      }
+      if (onlineRole === 'host' && turnIndex !== onlineSeat) return;
+      return localExecuteTokenMove(tokenIdx);
+    };
+
+    document.getElementById('createOnlineRoomBtn').addEventListener('click', createOnlineRoom);
+    document.getElementById('joinOnlineRoomBtn').addEventListener('click', () => {
+      document.getElementById('onlineRoomJoinRow').classList.remove('hidden');
+      document.getElementById('onlineRoomCode').focus();
+    });
+    document.getElementById('connectOnlineRoomBtn').addEventListener('click', () => {
+      const code = document.getElementById('onlineRoomCode').value.trim().toLowerCase();
+      if (!/^[a-z0-9]{6}$/.test(code)) {
+        setOnlineStatus('Enter a 6-character code', 'bad');
+        return;
+      }
+      connectToHost(code);
+    });
+    document.getElementById('leaveOnlineRoomBtn').addEventListener('click', () => disconnectOnline());
+    document.getElementById('onlineRoomCode').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('connectOnlineRoomBtn').click();
+    });
+
+    // =========================================================================
+    // 8. EVENT LISTENERS & VISIBILITY RECONNECTION HANDLING
+    // =========================================================================
+    canvas.addEventListener('click', (e) => {
+      if (phase !== 'MOVE' || remainingSeconds <= 0 || isGamePaused) return;
+      const player = currentPlayer();
+      if (!player || player.isBot || player.status !== 'ACTIVE') return;
+
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const cell = rect.width / 15;
+
+      let chosenIdx = -1;
+      let minDist = cell * 0.95;
+
+      validTokenIndices.forEach(tIdx => {
+        const [gc, gr] = getTokenGridCenter(player, tIdx);
+        const tx = gc * cell;
+        const ty = gr * cell;
+        const dist = Math.hypot(clickX - tx, clickY - ty);
+        if (dist < minDist) {
+          minDist = dist;
+          chosenIdx = tIdx;
+        }
+      });
+
+      if (chosenIdx !== -1) {
+        executeTokenMove(chosenIdx);
+      }
+    });
+
+    document.getElementById('centerDiceBtn').addEventListener('click', () => handleRollDice());
+    document.getElementById('diceBtn').addEventListener('click', () => handleRollDice());
+    document.getElementById('topOpponentDiceBtn').addEventListener('click', () => handleRollDice());
+    document.getElementById('rollActionBtn').addEventListener('click', () => handleRollDice());
+
+    document.getElementById('toggleDrawerBtn').addEventListener('click', () => {
+      const drawer = document.getElementById('controlsDrawer');
+      drawer.classList.toggle('hidden');
+    });
+
+    document.getElementById('topInfoBtn').addEventListener('click', () => {
+      showTurnNotification('Each player has 3 green Missed-Turn dots. Missing 3 turns eliminates the player!', 'Rules Info', 'warn');
+    });
+
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`tokenBtn${i}`).addEventListener('click', () => {
+        executeTokenMove(i);
+      });
+    }
+
+    document.getElementById('turnLimitSelect').addEventListener('change', (e) => {
+      turnDurationSeconds = parseInt(e.target.value, 10) || 10;
+      if (phase === 'ROLL' && isTurnTimerRunning) {
+        startTurnTimer(currentTurnId);
+      }
+    });
+
+    document.getElementById('simulateTimeoutBtn').addEventListener('click', () => {
+      if (phase !== 'GAME_OVER' && !isGamePaused) {
+        handleTurnTimeout(currentTurnId);
+      }
+    });
+
+    document.getElementById('pauseGameBtn').addEventListener('click', () => {
+      if (phase === 'GAME_OVER') return;
+      isGamePaused = !isGamePaused;
+      document.getElementById('pauseGameBtn').textContent = isGamePaused ? '▶ Resume' : '⏸ Pause';
+      if (!isGamePaused && phase === 'ROLL' && isTurnTimerRunning) {
+        turnDeadlineMs = Date.now() + turnRemainingMs;
+        if (currentPlayer() && currentPlayer().isBot) {
+          const thisTurnId = currentTurnId;
+          botTimer = setTimeout(() => {
+            if (phase === 'GAME_OVER' || isGamePaused || currentTurnId !== thisTurnId) return;
+            handleRollDice();
+          }, 400);
+        }
+      }
+      updateUI();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isTurnTimerRunning && !isGamePaused && phase !== 'GAME_OVER') {
+        turnRemainingMs = Math.max(0, turnDeadlineMs - Date.now());
+        updateTurnTimerUI();
+        if (turnRemainingMs <= 0) {
+          handleTurnTimeout(currentTurnId);
+        }
+      }
+    });
+
+    const timer4mBtn = document.getElementById('timer4mBtn');
+    const timer10mBtn = document.getElementById('timer10mBtn');
+
+    function setTimerDuration(mins) {
+      selectedMinutes = mins;
+      timer4mBtn.className = mins === 4
+        ? 'px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white transition'
+        : 'px-2 py-0.5 rounded-full font-semibold text-slate-200 hover:text-white transition';
+      timer10mBtn.className = mins === 10
+        ? 'px-2 py-0.5 rounded-full font-bold bg-indigo-600 text-white transition'
+        : 'px-2 py-0.5 rounded-full font-semibold text-slate-200 hover:text-white transition';
+      setupGame();
+    }
+
+    timer4mBtn.addEventListener('click', () => setTimerDuration(4));
+    timer10mBtn.addEventListener('click', () => setTimerDuration(10));
+
+    document.getElementById('testTimeUpBtn').addEventListener('click', () => {
+      if (phase !== 'GAME_OVER') {
+        endGameByTimer();
+      }
+    });
+
+    document.getElementById('modeSelect').addEventListener('change', (e) => {
+      gameMode = e.target.value;
+      setupGame();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('playAgainBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('playGameModalBtn').addEventListener('click', requestOnlineNewGame);
+    document.getElementById('sidePlayGameBtn').addEventListener('click', requestOnlineNewGame);
+
+    document.getElementById('muteBtn').addEventListener('click', () => {
+      isMuted = !isMuted;
+      document.getElementById('muteIcon').textContent = isMuted ? '🔇' : '🔊';
+      document.getElementById('muteLabel').textContent = isMuted ? 'Muted' : 'Sound On';
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (phase === 'GAME_OVER' || isGamePaused) return;
+      if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (phase === 'ROLL' && !currentPlayer().isBot) {
+          handleRollDice();
+        } else if (phase === 'MOVE' && !currentPlayer().isBot && validTokenIndices.length > 0) {
+          executeTokenMove(validTokenIndices[0]);
+        }
+      } else if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
+        const idx = parseInt(e.code.replace('Digit', ''), 10) - 1;
+        if (phase === 'MOVE' && !currentPlayer().isBot && validTokenIndices.includes(idx)) {
+          executeTokenMove(idx);
+        }
+      }
+    });
+
+    const tabs = [
+      { btn: 'tabBtnHtml', content: 'tabContentHtml' },
+      { btn: 'tabBtnState', content: 'tabContentState' },
+      { btn: 'tabBtnRules', content: 'tabContentRules' }
+    ];
+    tabs.forEach(({ btn, content }) => {
+      document.getElementById(btn).addEventListener('click', () => {
+        tabs.forEach(t => {
+          const isSelected = (t.btn === btn);
+          document.getElementById(t.content).classList.toggle('hidden', !isSelected);
+          document.getElementById(t.btn).className = isSelected
+            ? 'flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white transition'
+            : 'flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition';
+        });
+      });
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+    window.onload = () => {
+      setupGame();
+      resizeCanvas();
+      startAnimationLoop();
+      const requestedTimer = new URLSearchParams(window.location.search).get('timer');
+      if (requestedTimer === '4' || requestedTimer === '10') {
+        setTimerDuration(Number(requestedTimer));
+      }
+    };
+  </script>
+</body>
+</html>
